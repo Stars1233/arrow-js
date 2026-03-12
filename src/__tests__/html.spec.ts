@@ -498,7 +498,7 @@ describe('html', () => {
   it('can render a list with a for loop', async () => {
     const data = reactive({ list: ['a', 'b', 'c'] as string[] })
     const parent = document.createElement('div')
-    function list(items: any[]): Array<CallableFunction> {
+    function list(items: string[]): ArrowTemplate[] {
       const els: ArrowTemplate[] = []
       for (const i in items) {
         els.push(html`<li>${items[i]}</li>`)
@@ -554,7 +554,7 @@ describe('html', () => {
       },
     })
     const parent = document.createElement('div')
-    function list(items: any): Array<CallableFunction> {
+    function list(items: Record<string, string>): ArrowTemplate[] {
       const els: ArrowTemplate[] = []
       for (const i in items) {
         els.push(html`<li>${i}: ${items[i]}</li>`)
@@ -817,12 +817,12 @@ describe('html', () => {
         { name: 'virginia', abbr: 'va' },
         { name: 'nebraska', abbr: 'ne' },
         { name: 'california', abbr: 'ca' },
-      ],
+      ] as Array<{ name: string; abbr: string }>,
     })
     html`<ul data-country="${data.country}">
       ${() =>
         data.states.map(
-          (state: any) =>
+          (state: { name: string; abbr: string }) =>
             html`<li data-abbr="${() => state.abbr}">${() => state.name}</li>`
         )}
       <li data-first-abbr="${() => data.states[0].abbr}">
@@ -830,7 +830,7 @@ describe('html', () => {
       </li>
     </ul> `(parent)
     expect(parent.innerHTML).toMatchSnapshot()
-    data.states.sort((a: any, b: any) => {
+    data.states.sort((a, b) => {
       return a.abbr > b.abbr ? 1 : -1
     })
     await nextTick()

@@ -39,7 +39,7 @@ export function isR(obj: unknown): obj is Reactive<ReactiveTarget> {
 }
 
 export function isChunk(chunk: unknown): chunk is Chunk {
-  return isO(chunk) && '$' in chunk
+  return isO(chunk) && 'ref' in chunk
 }
 
 /**

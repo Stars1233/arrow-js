@@ -146,11 +146,6 @@ export interface Chunk {
    */
   readonly paths: Array<string | number>[]
   /**
-   * A unique symbol that is used to identify this chunk, symbols are equal if
-   * the HTML used to produce the chunk is equal.
-   */
-  readonly $: symbol
-  /**
    * A document fragment that contains the HTML of this chunk. Note: this is
    * only populated with nodes until those nodes are mounted.
    */
@@ -175,16 +170,7 @@ export interface Chunk {
   u?: Array<() => void> | null
 }
 
-/**
- * A partial chunk is a chunk that has been partially mounted. It is missing
- * some assignments, but already has their space reserved (mem performance).
- */
-type PartialChunk = Omit<Chunk, '_t' | 'k' | 'ref'> & {
-  _t: () => null
-  k: null
-  ref: null
-  u: null
-}
+type ChunkProto = Pick<Chunk, 'dom' | 'paths'>
 
 /**
  * A reference to the DOM elements mounted by a chunk.
@@ -200,7 +186,7 @@ interface DOMRef {
  * node creation, and then perform occasional clean up work.
  */
 let bindingStackPos = -1
-const bindingStack: Array<Node | string | number> = new Array(2000).fill({})
+const bindingStack: Array<Node | string | number> = []
 
 /**
  * The delimiter that describes where expressions are located.
@@ -211,36 +197,12 @@ const delimiterComment = `<!--${delimiter}-->`
 /**
  * A memo of pathed chunks that have been created.
  */
-const chunkMemo: Record<string, PartialChunk> = {}
+const chunkMemo: Record<string, ChunkProto> = {}
 
 type Rendered = Chunk | Text | Comment
 type InternalTemplate = ArrowTemplate & {
   d?: () => void
   x?: () => void
-}
-
-function createDOMRef(dom: DocumentFragment): DOMRef {
-  return {
-    f: dom.firstChild as ChildNode | null,
-    l: dom.lastChild as ChildNode | null,
-  }
-}
-
-function appendDOMRef(ref: DOMRef, target: ParentNode) {
-  let node = ref.f
-  if (!node) return
-  const last = ref.l
-  if (node === last) {
-    target.appendChild(node)
-    return
-  }
-  while (node) {
-    const next: ChildNode | null =
-      node === last ? null : (node.nextSibling as ChildNode | null)
-    target.appendChild(node)
-    if (!next) break
-    node = next
-  }
 }
 
 function moveDOMRef(ref: DOMRef, anchor: ChildNode, after?: boolean) {
@@ -257,39 +219,6 @@ function moveDOMRef(ref: DOMRef, anchor: ChildNode, after?: boolean) {
     const next: ChildNode | null =
       node === last ? null : (node.nextSibling as ChildNode | null)
     parent.insertBefore(node, target)
-    if (!next) break
-    node = next
-  }
-}
-
-function replaceDOMRef(
-  ref: DOMRef,
-  oldNode: ChildNode,
-  newNode: ChildNode | DocumentFragment
-) {
-  if (oldNode !== ref.f && oldNode !== ref.l) return
-  const first = newNode.nodeType === 11
-    ? (newNode.firstChild as ChildNode | null)
-    : (newNode as ChildNode)
-  const last = newNode.nodeType === 11
-    ? (newNode.lastChild as ChildNode | null)
-    : (newNode as ChildNode)
-  if (oldNode === ref.f) ref.f = first
-  if (oldNode === ref.l) ref.l = last
-}
-
-function removeDOMRef(ref: DOMRef) {
-  let node = ref.f
-  if (!node) return
-  const last = ref.l
-  if (node === last) {
-    node.remove()
-    return
-  }
-  while (node) {
-    const next: ChildNode | null =
-      node === last ? null : (node.nextSibling as ChildNode | null)
-    node.remove()
     if (!next) break
     node = next
   }
@@ -336,10 +265,22 @@ export function html(
   const template = ((el?: ParentNode) => {
     if (!hasMounted) {
       hasMounted = true
-      return createBindings(getChunk(), getExpressionPointer())(el)
+      return createBindings(getChunk(), getExpressionPointer(), el)
     } else {
       const chunk = getChunk()
-      appendDOMRef(chunk.ref, chunk.dom)
+      let node = chunk.ref.f
+      if (node) {
+        const last = chunk.ref.l
+        if (node === last) chunk.dom.appendChild(node)
+        else
+          while (node) {
+            const next: ChildNode | null =
+              node === last ? null : (node.nextSibling as ChildNode | null)
+            chunk.dom.appendChild(node)
+            if (!next) break
+            node = next
+          }
+      }
       return el ? el.appendChild(chunk.dom) : chunk.dom
     }
   }) as InternalTemplate
@@ -376,23 +317,20 @@ export function html(
  */
 function createBindings(
   chunk: Chunk,
-  expressionPointer: number
-): ArrowFragment {
+  expressionPointer: number,
+  el?: ParentNode
+): ParentNode | DocumentFragment {
   const totalPaths = expressionPool[expressionPointer] as number
   const stackStart = bindingStackPos + 1
   for (let i = 0; i < totalPaths; i++) {
     const path = chunk.paths[i]
-    const len = path.length
     let node: Node = chunk.dom
-    for (let i = 0; i < len; i++) {
-      const segment = path[i]
-      if (typeof segment === 'number')
-        node = node.childNodes.item(segment as number)
-      if (i === len - 1) {
-        bindingStack[++bindingStackPos] = node
-        bindingStack[++bindingStackPos] = segment
-      }
-    }
+    const segment = path[path.length - 1]
+    const last = typeof segment === 'string' ? path.length - 1 : path.length
+    for (let i = 0; i < last; i++)
+      node = node.childNodes.item(path[i] as number)
+    bindingStack[++bindingStackPos] = node
+    bindingStack[++bindingStackPos] = segment
   }
   const stackEnd = bindingStackPos
   for (let s = stackStart, e = expressionPointer + 1; s < stackEnd; s++, e++) {
@@ -404,10 +342,9 @@ function createBindings(
       createNodeBinding(node as ChildNode, e, chunk)
     }
   }
-  for (let i = stackStart; i <= stackEnd; i++) bindingStack[i] = 0
+  bindingStack.length = stackStart
   bindingStackPos = stackStart - 1
-  return ((el?: ParentNode) =>
-    el ? el.appendChild(chunk.dom) && el : chunk.dom) as ArrowFragment
+  return el ? el.appendChild(chunk.dom) && el : chunk.dom
 }
 
 /**
@@ -428,7 +365,7 @@ function createNodeBinding(
     fragment = createRenderFn()(expression)!
   } else if (typeof expression === 'function') {
     const [frag, stop] = watch(expressionPointer, createRenderFn())
-    addCleanup(parentChunk, stop)
+    ;(parentChunk.u ??= []).push(stop)
     fragment = frag!
   } else {
     fragment = isEmpty(expression)
@@ -439,7 +376,18 @@ function createNodeBinding(
       (value: string) => (fragment.nodeValue = value)
     )
   }
-  updateChunkRef(parentChunk, node, fragment)
+  if (node === parentChunk.ref.f || node === parentChunk.ref.l) {
+    const last = fragment.nodeType === 11
+      ? (fragment.lastChild as ChildNode | null)
+      : (fragment as ChildNode)
+    if (node === parentChunk.ref.f) {
+      parentChunk.ref.f =
+        fragment.nodeType === 11
+          ? (fragment.firstChild as ChildNode | null)
+          : (fragment as ChildNode)
+    }
+    if (node === parentChunk.ref.l) parentChunk.ref.l = last
+  }
   node.parentNode?.replaceChild(fragment, node)
 }
 
@@ -468,31 +416,13 @@ function createAttrBinding(
     const [, stop] = watch(expressionPointer, (value) =>
       setAttr(el, attrName, value as string)
     )
-    addCleanup(parentChunk, stop)
+    ;(parentChunk.u ??= []).push(stop)
   } else {
     setAttr(el, attrName, expression as string | number | boolean | null)
     onExpressionUpdate(expressionPointer, (value: string) =>
       setAttr(el, attrName, value)
     )
   }
-}
-
-/**
- * Updates the `ref` array of a parent chunk with a new node.
- * @param parentChunk - A parent chunk to update.
- * @param oldNode - The old node to remove from the parent chunk’s ref array.
- * @param newNode - The new node to add to the parent chunk’s ref array.
- */
-function updateChunkRef(
-  parentChunk: Chunk,
-  oldNode: ChildNode,
-  newNode: ChildNode | DocumentFragment
-) {
-  replaceDOMRef(parentChunk.ref, oldNode, newNode)
-}
-
-function addCleanup(chunk: Chunk, cleanup: () => void) {
-  ;(chunk.u ??= []).push(cleanup)
 }
 
 /**
@@ -535,7 +465,7 @@ function createRenderFn(): (
         if (!Array.isArray(previous)) {
           // Rendering a list where previously there was not a list.
           const [fragment, newList] = renderList(renderable)
-          getLastNode(previous).after(fragment)
+          getNode(previous).after(fragment)
           forgetChunk(previous)
           unmount(previous)
           previous = newList
@@ -581,12 +511,12 @@ function createRenderFn(): (
               continue
             }
             const used = patch(item, prev, anchor) as Rendered
-            anchor = getLastNode(used)
+            anchor = getNode(used)
             renderedList[i] = used
             previousToRemove.delete(used)
           }
           if (!renderableLength) {
-            getLastNode(previous[0]).after(
+            getNode(previous[0]).after(
               (renderedList[0] = document.createComment(''))
             )
           } else if (renderableLength > previousLength) {
@@ -656,10 +586,10 @@ function createRenderFn(): (
         if (anchor) {
           moveDOMRef(keyedChunk.ref, anchor, true)
         } else {
-          moveDOMRef(keyedChunk.ref, getFirstNode(prev))
+          moveDOMRef(keyedChunk.ref, getNode(prev, undefined, true))
         }
         return keyedChunk
-      } else if (isChunk(prev) && prev.$ === chunk.$) {
+      } else if (isChunk(prev) && prev.paths === chunk.paths) {
         // This is a template that has already been rendered, so we only need to
         // update the expressions
         updateExpressions(chunk._t._e, prev._t._e)
@@ -668,7 +598,7 @@ function createRenderFn(): (
       }
 
       // This is a new template, render it
-      getLastNode(prev, anchor).after(renderable())
+      getNode(prev, anchor).after(renderable())
       forgetChunk(prev)
       unmount(prev)
       // If this chunk had a key, set it in our keyed chunks.
@@ -678,7 +608,7 @@ function createRenderFn(): (
       // This is an empty value and the prev value was not a comment
       // so we need to remove the prev value and replace it with a comment.
       const comment = document.createComment('')
-      getLastNode(prev, anchor).after(comment)
+      getNode(prev, anchor).after(comment)
       forgetChunk(prev)
       unmount(prev)
       return comment
@@ -738,7 +668,19 @@ const queueUnmount = queue(() => {
         for (let i = 0; i < chunk.u.length; i++) chunk.u[i]()
         chunk.u = null
       }
-      removeDOMRef(chunk.ref)
+      let node = chunk.ref.f
+      if (node) {
+        const last = chunk.ref.l
+        if (node === last) node.remove()
+        else
+          while (node) {
+            const next: ChildNode | null =
+              node === last ? null : (node.nextSibling as ChildNode | null)
+            node.remove()
+            if (!next) break
+            node = next
+          }
+      }
       ;(chunk._t as InternalTemplate).d?.()
     } else if (Array.isArray(chunk)) {
       for (let i = 0; i < chunk.length; i++) removeItems(chunk[i])
@@ -783,26 +725,16 @@ function isEmpty(value: unknown): value is null | undefined | '' | false {
  * @param chunk - The previous chunk or Text node that was rendered.
  * @returns
  */
-function getLastNode(
+function getNode(
   chunk: Chunk | Text | Comment | Array<Chunk | Text | Comment> | undefined,
-  anchor?: ChildNode
+  anchor?: ChildNode,
+  first?: boolean
 ): ChildNode {
   if (!chunk && anchor) return anchor
   if (isChunk(chunk)) {
-    return chunk.ref.l || chunk.ref.f || anchor!
+    return first ? chunk.ref.f || chunk.ref.l! : chunk.ref.l || chunk.ref.f || anchor!
   } else if (Array.isArray(chunk)) {
-    return getLastNode(chunk[chunk.length - 1])
-  }
-  return chunk!
-}
-
-function getFirstNode(
-  chunk: Chunk | Text | Comment | Array<Chunk | Text | Comment> | undefined
-): ChildNode {
-  if (isChunk(chunk)) {
-    return chunk.ref.f || chunk.ref.l!
-  } else if (Array.isArray(chunk)) {
-    return getFirstNode(chunk[0])
+    return getNode(chunk[first ? 0 : chunk.length - 1], anchor, first)
   }
   return chunk!
 }
@@ -813,22 +745,6 @@ function getFirstNode(
  * @param memoKey - The key to memoize the chunk under.
  * @returns
  */
-function initChunk(
-  html: string
-): PartialChunk {
-  const tpl = document.createElement('template')
-  tpl.innerHTML = html
-  return (chunkMemo[html] = {
-    dom: tpl.content,
-    paths: createPaths(tpl.content),
-    $: Symbol(),
-    _t: () => null,
-    k: null,
-    ref: null,
-    u: null,
-  })
-}
-
 /**
  * Given a string of raw interlaced HTML (the arrow comments are already in the
  * approximately correct place), produce a Chunk object and memoize it.
@@ -837,15 +753,25 @@ function initChunk(
  */
 export function createChunk(
   rawStrings: TemplateStringsArray | string[]
-): Omit<PartialChunk, 'ref'> & { ref: DOMRef } {
+): Omit<Chunk, 'ref'> & { ref: DOMRef } {
   const memoKey = rawStrings.join(delimiterComment)
-  const chunk: PartialChunk = chunkMemo[memoKey] ?? initChunk(memoKey)
+  const chunk: ChunkProto =
+    chunkMemo[memoKey] ??
+    (() => {
+      const tpl = document.createElement('template')
+      tpl.innerHTML = memoKey
+      return (chunkMemo[memoKey] = {
+        dom: tpl.content,
+        paths: createPaths(tpl.content),
+      })
+    })()
   const dom = chunk.dom.cloneNode(true) as DocumentFragment
-  const instance = Object.create(chunk) as Omit<PartialChunk, 'ref'> & {
-    ref: DOMRef
-  }
+  const instance = Object.create(chunk) as Omit<Chunk, 'ref'> & { ref: DOMRef }
   instance.dom = dom
-  instance.ref = createDOMRef(dom)
+  instance.ref = {
+    f: dom.firstChild as ChildNode | null,
+    l: dom.lastChild as ChildNode | null,
+  }
   return instance
 }
 
@@ -870,7 +796,7 @@ function filterNode(el: Node): 1 | 2 {
   if (el.nodeType === 8) return 1
   if (el.nodeType === 1) {
     const attrLen = (el as Element).attributes.length
-    if (attrList.length) attrList.length = 0
+    attrList.length = 0
     for (let i = 0; i < attrLen; i++) {
       const attr = (el as Element).attributes[i]
       if (attr.value === delimiterComment) attrList.push(attr.name)
@@ -885,14 +811,6 @@ function filterNode(el: Node): 1 | 2 {
  * @param path - The path to the expression
  * @returns
  */
-function attrsForNode(path: number[]): Array<number | string>[] {
-  const attrs: Array<number | string>[] = []
-  for (let i = 0; i < attrList.length; i++) {
-    attrs.push([...path, attrList[i]])
-  }
-  return attrs
-}
-
 /**
  * Given a document fragment with expressions comments, produce an array of
  * paths to the expressions and attribute expressions, and remove any attribute
@@ -907,7 +825,9 @@ export function createPaths(dom: DocumentFragment): Chunk['paths'] {
   while ((node = nodes.nextNode())) {
     const path = getPath(node)
     if (node.nodeType === 1) {
-      paths.push(...attrsForNode(path))
+      for (let i = 0; i < attrList.length; i++) {
+        paths.push([...path, attrList[i]])
+      }
     } else {
       paths.push(path)
     }

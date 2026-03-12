@@ -2,8 +2,9 @@ import { describe, it, expect } from 'vitest'
 import { createPool, Pool, PoolNode } from '../pool'
 
 type Item = { value: string | null } & PoolNode<Item>
+type ItemArgs = [value: string]
 
-function allocate(this: Pool<Item, typeof allocate>, value: string) {
+function allocate(this: Pool<Item, ItemArgs>, value: string) {
   const item = this.next()
   item.value = value
   this.head = item.next!

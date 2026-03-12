@@ -59,10 +59,7 @@ export interface PropertyObserver<T> {
  */
 type Dependencies = Array<number | PropertyKey>
 
-/**
- * A map of objects to their reactive proxies.
- */
-const reactiveMemo = new WeakMap<ReactiveTarget, Reactive<ReactiveTarget>>()
+type ListenerMap = Partial<Record<PropertyKey, Set<PropertyObserver<unknown>>>>
 
 /**
  * A registry of reactive objects to their unique numeric index which serves as
@@ -73,9 +70,7 @@ const ids = new WeakMap<ReactiveTarget, number>()
 /**
  * A registry of reactive objects to their property observers.
  */
-const listeners: {
-  [property: PropertyKey]: Set<PropertyObserver<unknown>>
-}[] = new Array(5000).fill({})
+const listeners: ListenerMap[] = []
 
 /**
  * Gets the unique id of a given target.
@@ -138,8 +133,6 @@ const parents: Array<[parent: number, property: PropertyKey]>[] = []
 export function reactive<T extends ReactiveTarget>(data: T): Reactive<T> {
   // The data is already a reactive object, so return it.
   if (isR(data)) return data as Reactive<T>
-  // This object already has a proxy, return it.
-  if (reactiveMemo.has(data)) return reactiveMemo.get(data) as Reactive<T>
   // Only valid objects can be reactive.
   if (!isO(data)) throw Error('Non object passed to reactive.')
   // Create a new slot in the listeners registry and then store the relationship
@@ -180,7 +173,7 @@ function get(
   id: number,
   target: ReactiveTarget,
   key: PropertyKey,
-  receiver: any
+  receiver: object
 ): unknown {
   if (key in api) return api[key as keyof typeof api](target)
   const result = Reflect.get(target, key, receiver)
@@ -220,7 +213,7 @@ function trackArray(
         target,
         args
       )
-      parentEmit(id)
+      parents[id]?.forEach(([parentId, property]) => emit(parentId, property))
       return result
     }
   }
@@ -239,7 +232,7 @@ function set(
   target: ReactiveTarget,
   key: PropertyKey,
   value: unknown,
-  receiver: any
+  receiver: object
 ): boolean {
   // If this is a new property then we need to notify parent properties
   const isNewProperty = !(key in target)
@@ -259,7 +252,9 @@ function set(
   // Notify all listeners
   emit(id, key, value, oldValue, isNewProperty)
   // If the array length is modified, notify all parents
-  if (Array.isArray(target) && key === 'length') parentEmit(id)
+  if (Array.isArray(target) && key === 'length') {
+    parents[id]?.forEach(([parentId, property]) => emit(parentId, property))
+  }
   return didSucceed
 }
 
@@ -323,20 +318,13 @@ function emit(
   notifyParents?: boolean
 ) {
   const targetListeners = listeners[id]
-  if (targetListeners[key]) {
-    targetListeners[key].forEach((callback) => callback(newValue, oldValue))
+  const propertyListeners = targetListeners[key]
+  if (propertyListeners) {
+    propertyListeners.forEach((callback) => callback(newValue, oldValue))
   }
   if (notifyParents) {
     parents[id]?.forEach(([parentId, property]) => emit(parentId, property))
   }
-}
-
-/**
- * Notify all parents that the child object has changed.
- * @param id - The id of the parent object.
- */
-function parentEmit(id: number) {
-  parents[id]?.forEach(([parentId, property]) => emit(parentId, property))
 }
 
 /**
@@ -345,45 +333,19 @@ function parentEmit(id: number) {
 const api = {
   $on:
     (target: ReactiveTarget): ReactiveAPI<ReactiveTarget>['$on'] =>
-    (property, callback) =>
-      addListener(getId(target), property, callback),
+    (property, callback) => {
+      const targetListeners = listeners[getId(target)] as ListenerMap
+      const key = property as PropertyKey
+      const propertyListeners =
+        targetListeners[key] ?? (targetListeners[key] = new Set())
+      propertyListeners.add(callback as PropertyObserver<unknown>)
+    },
   $off:
     (target: ReactiveTarget): ReactiveAPI<ReactiveTarget>['$off'] =>
     (property, callback) =>
-      removeListener(getId(target), property, callback),
-}
-
-/**
- * Adds a listener to a reactive object.
- * @param id - The id of the target object.
- * @param property - The property to listen to.
- * @param callback - The callback to call when the property changes.
- */
-function addListener(
-  id: number,
-  property: PropertyKey,
-  callback: PropertyObserver<any>
-) {
-  const targetListeners = listeners[id]
-  targetListeners[property] ??= new Set()
-  targetListeners[property].add(callback)
-}
-
-/**
- * Removes a listener from a reactive object.
- * @param id - The id of the target object.
- * @param property - The property to remove the listener from.
- * @param callback - The callback to remove.
- */
-function removeListener(
-  id: number,
-  property: PropertyKey,
-  callback: PropertyObserver<any>
-) {
-  const targetListeners = listeners[id]
-  if (targetListeners[property]) {
-    targetListeners[property].delete(callback)
-  }
+      (listeners[getId(target)] as ListenerMap)[property as PropertyKey]?.delete(
+        callback as PropertyObserver<unknown>
+      ),
 }
 
 /**
@@ -412,7 +374,16 @@ function stopTracking(watchKey: number, callback: PropertyObserver<unknown>) {
   const key = trackKey--
   const deps = trackedDependencies[key]
   flushListeners(watchedDependencies[watchKey], callback)
-  addListeners(deps, callback)
+  const len = deps.length
+  for (let i = 0; i < len; i += 2) {
+    const targetListeners = listeners[deps[i] as number]
+    const property = deps[i + 1]
+    const propertyListeners =
+      (targetListeners[property] ??= new Set()) as Set<
+        PropertyObserver<unknown>
+      >
+    propertyListeners.add(callback)
+  }
   watchedDependencies[watchKey] = deps
   trackedDependencies[key] = []
 }
@@ -430,19 +401,7 @@ function flushListeners(
   if (!deps) return
   const len = deps.length
   for (let i = 0; i < len; i += 2) {
-    listeners[deps[i] as number][deps[i + 1]].delete(callback)
-  }
-}
-
-/**
- * Adds a callback to the listeners registry for a given set of dependencies.
- * @param deps - The dependencies to add listeners for.
- * @param callback - The callback to add.
- */
-function addListeners(deps: Dependencies, callback: PropertyObserver<unknown>) {
-  const len = deps.length
-  for (let i = 0; i < len; i += 2) {
-    addListener(deps[i] as number, deps[i + 1], callback)
+    listeners[deps[i] as number][deps[i + 1]]?.delete(callback)
   }
 }
 
@@ -455,15 +414,15 @@ export function watch<A extends (arg: ArrowRenderable) => unknown>(
   pointer: number,
   afterEffect: A
 ): [returnValue: ReturnType<A>, stop: () => void]
-export function watch<F extends (...args: any[]) => any>(
+export function watch<F extends (...args: unknown[]) => unknown>(
   effect: F
 ): [returnValue: ReturnType<F>, stop: () => void]
 export function watch<
-  F extends (...args: any[]) => any,
+  F extends (...args: unknown[]) => unknown,
   A extends (arg: ReturnType<F>) => unknown
 >(effect: F, afterEffect: A): [returnValue: ReturnType<A>, stop: () => void]
 export function watch<
-  F extends (...args: any[]) => any,
+  F extends (...args: unknown[]) => unknown,
   A extends (arg: ReturnType<F>) => unknown
 >(
   effect: F | number,
@@ -471,7 +430,9 @@ export function watch<
 ): [returnValue: ReturnType<F> | ReturnType<A>, stop: () => void] {
   const watchKey = ++watchIndex
   const isPointer = Number.isInteger(effect)
-  let rerun: null | PropertyObserver<any> = queue(runEffect)
+  let rerun: null | PropertyObserver<unknown> = queue(
+    runEffect as PropertyObserver<unknown>
+  )
   function runEffect() {
     startTracking()
 

@@ -3,7 +3,7 @@
  * greatly minimizes the need for garbage collection, which is a major source
  * of slowdowns in JavaScript programs in general.
  */
-export interface Pool<T, A> {
+export interface Pool<T, A extends unknown[]> {
   /**
    * Accepts user defined arguments and assigns those arguments to properties
    * on a pool object. This is the primary mechanism for "creating" and reusing
@@ -11,7 +11,7 @@ export interface Pool<T, A> {
    * @param this - The pool object.
    * @param args - User defined arguments.
    */
-  allocate: A
+  allocate: (this: Pool<T, A>, ...args: A) => T
   /**
    * Creates a new empty object for assignment in the pool.
    * @returns
@@ -77,8 +77,12 @@ export interface PoolNode<T> {
  */
 export function createPool<
   T extends PoolNode<T>,
-  A extends (this: Pool<T, A>, ...args: any[]) => T
->(size: number, create: () => T, allocate: A): Pool<T, A> {
+  A extends unknown[]
+>(
+  size: number,
+  create: () => T,
+  allocate: (this: Pool<T, A>, ...args: A) => T
+): Pool<T, A> {
   const data: T[] = []
   const pool: Pool<T, A> = {
     data,
@@ -101,10 +105,10 @@ export function createPool<
  * @param size
  * @returns
  */
-function grow<T extends PoolNode<T>>(
-  this: Pool<T, any>,
+function grow<T extends PoolNode<T>, A extends unknown[]>(
+  this: Pool<T, A>,
   size: number
-): Pool<T, any> {
+): Pool<T, A> {
   for (let i = 0; i < size; i++) {
     this.data.push(this.free(this.create()))
   }
@@ -116,7 +120,10 @@ function grow<T extends PoolNode<T>>(
  * @param this - Free a node for reuse.
  * @param node -
  */
-function free<T extends PoolNode<T>>(this: Pool<T, any>, node: T): T {
+function free<T extends PoolNode<T>, A extends unknown[]>(
+  this: Pool<T, A>,
+  node: T
+): T {
   node.next = this.head
   this.head = node
   return node
@@ -127,6 +134,6 @@ function free<T extends PoolNode<T>>(this: Pool<T, any>, node: T): T {
  * @param this
  * @returns
  */
-function next<T extends PoolNode<T>>(this: Pool<T, any>): T {
+function next<T extends PoolNode<T>, A extends unknown[]>(this: Pool<T, A>): T {
   return this.head ?? this.grow(this.size).head!
 }

@@ -16,7 +16,13 @@ describe('reactive', () => {
   })
 
   it('can record dependencies', async () => {
-    const data = reactive<Record<string, any>>({
+    const data = reactive<{
+      a: string
+      b: string
+      c: string
+      bar: { baz: string }
+      foo?: string
+    }>({
       a: 'foo',
       b: 'boo',
       c: 'can',
