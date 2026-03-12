@@ -8,7 +8,7 @@ const queueStack: Set<CallableFunction> = new Set()
 /**
  * A stack of functions to run on the next tick.
  */
-const nextTicks: Set<CallableFunction> = new Set()
+let nextTicks: CallableFunction[] = []
 
 /**
  * Adds the ability to listen to the next tick.
@@ -19,7 +19,7 @@ export function nextTick(fn?: CallableFunction): Promise<unknown> {
   return !queueStack.size
     ? Promise.resolve(fn?.())
     : new Promise((resolve: (value?: unknown) => void) =>
-        nextTicks.add(() => {
+        nextTicks.push(() => {
           fn?.()
           resolve()
         })
@@ -58,8 +58,8 @@ export function queue<T extends unknown>(
       // during the execution of the current queue.
       const queue = [...queueStack]
       queueStack.clear()
-      const ticks = [...nextTicks]
-      nextTicks.clear()
+      const ticks = nextTicks
+      nextTicks = []
       queue.forEach((fn) => fn(newValue, oldValue))
       ticks.forEach((fn) => fn())
       if (queueStack.size) {

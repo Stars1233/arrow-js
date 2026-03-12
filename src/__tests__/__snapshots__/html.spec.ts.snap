@@ -1,10 +1,10 @@
 // Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
 
-exports[`html > can conditionally show/remove nodes 1`] = `"<div class=\\"checkout\\"><!----></div>"`;
+exports[`html > can conditionally show/remove nodes 1`] = `"<div class=\\"checkout\\"></div>"`;
 
 exports[`html > can conditionally show/remove nodes 2`] = `"<div class=\\"checkout\\">Promo: <input type=\\"text\\"></div>"`;
 
-exports[`html > can conditionally show/remove nodes 3`] = `"<div class=\\"checkout\\"><!----></div>"`;
+exports[`html > can conditionally show/remove nodes 3`] = `"<div class=\\"checkout\\"></div>"`;
 
 exports[`html > can conditionally show/remove nodes 4`] = `"<div class=\\"checkout\\">Promo: <input type=\\"text\\"></div>"`;
 
@@ -107,7 +107,7 @@ exports[`html > can render an array of items and mutate an item in the array (#4
 
 exports[`html > can render an empty list, render some items, remove the items, and render some again 1`] = `
 "
-      <!---->
+      
     "
 `;
 
@@ -119,7 +119,7 @@ exports[`html > can render an empty list, render some items, remove the items, a
 
 exports[`html > can render an empty list, render some items, remove the items, and render some again 3`] = `
 "
-      <!---->
+      
     "
 `;
 

@@ -32,14 +32,14 @@ describe('createChunk', () => {
     expect(chunk.dom.childNodes[0].childNodes[0]).toBeInstanceOf(
       HTMLHeadingElement
     )
-    expect(chunk.paths).toEqual([])
+    expect(chunk.paths).toEqual([[], []])
   })
   it('can create a dom fragment with a basic expression in the body', () => {
     const chunk = createChunk(['<div>', '</div>'])
     expect(chunk.dom).toBeInstanceOf(DocumentFragment)
     expect(chunk.dom.childNodes[0]).toBeInstanceOf(HTMLDivElement)
     expect(chunk.dom.childNodes[0].childNodes[0]).toBeInstanceOf(Comment)
-    expect(chunk.paths).toEqual([[0, 0]])
+    expect(chunk.paths).toEqual([[0, 2, 0, 0, 0], []])
   })
   it('can create a dom fragment with a basic expression in the body and an attribute', () => {
     const chunk = createChunk(['<div data-foo="', '">', '</div>'])
@@ -49,10 +49,7 @@ describe('createChunk', () => {
     const mountPoint = document.createElement('div')
     mountPoint.appendChild(chunk.dom)
     // expect(mountPoint.innerHTML).toBe('<div data-foo="❲❍❳"><!--➳❍--></div>')
-    expect(chunk.paths).toEqual([
-      [0, 'data-foo'],
-      [0, 0],
-    ])
+    expect(chunk.paths).toEqual([[0, 1, 0, 1, 1, 1, 0, 0], ['data-foo']])
   })
   it('can create a dom fragment with a multiple basic expression in the body and an attributes', () => {
     // prettier-ignore
@@ -62,12 +59,8 @@ describe('createChunk', () => {
     const mountPoint = document.createElement('div')
     mountPoint.appendChild(chunk.dom)
     expect(chunk.paths).toEqual([
-      [0, 'data-foo'],
-      [0, 'hidden'],
-      [0, 0],
-      [0, 1, 'class'],
-      [0, 1, 'style'],
-      [0, 1, 0],
+      [0, 1, 0, 1, 1, 0, 2, 1, 1, 0, 0, 1, 1, 1, 3, 2, 0, 4, 2, 1, 0, 0],
+      ['data-foo', 'hidden', 'class', 'style'],
     ])
   })
 })
@@ -204,14 +197,14 @@ describe('html', () => {
   it('does not render falsy expressions', () => {
     const parent = document.createElement('div')
     html`${false}-${null}-${undefined}-${0}-${NaN}`(parent)
-    expect(parent.innerHTML).toBe('<!---->-<!---->-<!---->-0-<!---->')
+    expect(parent.innerHTML).toBe('---0-')
   })
 
   it('does not render falsy expression returns', () => {
     const parent = document.createElement('div')
     html`${() => false}-${() => null}-${() => undefined}-${() => 0}-${() =>
       NaN}`(parent)
-    expect(parent.innerHTML).toBe('<!---->-<!---->-<!---->-0-<!---->')
+    expect(parent.innerHTML).toBe('---0-')
   })
 
   it('can render simple text with expressions', async () => {
@@ -542,7 +535,7 @@ describe('html', () => {
     data.list.splice(0, 1)
     await nextTick()
     expect(parent.innerHTML).toBe(`<ul>
-      <!---->
+      
     </ul>`)
   })
 
@@ -771,7 +764,7 @@ describe('html', () => {
     const parent = document.createElement('div')
     expect(
       (html`${() => true}${() => false}`(parent) as Element).innerHTML
-    ).toBe('true<!---->')
+    ).toBe('true')
   })
 
   it('can render an attribute', () => {
