@@ -218,12 +218,8 @@ type PartialChunk = Omit<Chunk, '_t' | 'k' | 'a' | 'm' | 'ref'> & {
  * A reference to the DOM elements mounted by a chunk.
  */
 interface DOMRef {
-  nodes: ChildNode[]
-  appendTo: (target: ParentNode) => void
-  after: (anchor: ChildNode) => void
-  last: () => ChildNode
-  replace: (oldNode: ChildNode, newNode: ChildNode | DocumentFragment) => void
-  remove: () => void
+  f: ChildNode | null
+  l: ChildNode | null
 }
 
 /**
@@ -260,43 +256,96 @@ function releaseTemplate(template: ArrowTemplate) {
 }
 
 function createDOMRef(dom: DocumentFragment): DOMRef {
-  const nodes = Array.from(dom.childNodes) as ChildNode[]
   return {
-    nodes,
-    appendTo(target: ParentNode) {
-      for (let i = 0; i < nodes.length; i++) target.appendChild(nodes[i])
-    },
-    after(anchor: ChildNode) {
-      const parent = anchor.parentNode
-      if (!parent) return
-      let nextSibling = anchor.nextSibling
-      for (let i = 0; i < nodes.length; i++) {
-        parent.insertBefore(nodes[i], nextSibling)
-      }
-    },
-    last: () => nodes[nodes.length - 1],
-    replace(oldNode: ChildNode, newNode: ChildNode | DocumentFragment) {
-      let index = -1
-      for (let i = 0; i < nodes.length; i++) {
-        if (nodes[i] === oldNode) {
-          index = i
-          break
-        }
-      }
-      if (index === -1) return
-      if (isType(newNode, 11)) {
-        nodes.splice(index, 1)
-        const childNodes = newNode.childNodes
-        for (let i = childNodes.length - 1; i >= 0; i--) {
-          nodes.splice(index, 0, childNodes[i] as ChildNode)
-        }
-      } else {
-        nodes[index] = newNode as ChildNode
-      }
-    },
-    remove() {
-      for (let i = 0; i < nodes.length; i++) nodes[i].remove()
-    },
+    f: dom.firstChild as ChildNode | null,
+    l: dom.lastChild as ChildNode | null,
+  }
+}
+
+function appendDOMRef(ref: DOMRef, target: ParentNode) {
+  let node = ref.f
+  if (!node) return
+  const last = ref.l
+  if (node === last) {
+    target.appendChild(node)
+    return
+  }
+  while (node) {
+    const next: ChildNode | null =
+      node === last ? null : (node.nextSibling as ChildNode | null)
+    target.appendChild(node)
+    if (!next) break
+    node = next
+  }
+}
+
+function moveDOMRefAfter(ref: DOMRef, anchor: ChildNode) {
+  const parent = anchor.parentNode
+  let node = ref.f
+  if (!parent || !node) return
+  const last = ref.l
+  if (node === last) {
+    anchor.after(node)
+    return
+  }
+  const nextSibling = anchor.nextSibling
+  while (node) {
+    const next: ChildNode | null =
+      node === last ? null : (node.nextSibling as ChildNode | null)
+    parent.insertBefore(node, nextSibling)
+    if (!next) break
+    node = next
+  }
+}
+
+function moveDOMRefBefore(ref: DOMRef, anchor: ChildNode) {
+  const parent = anchor.parentNode
+  let node = ref.f
+  if (!parent || !node) return
+  const last = ref.l
+  if (node === last) {
+    parent.insertBefore(node, anchor)
+    return
+  }
+  while (node) {
+    const next: ChildNode | null =
+      node === last ? null : (node.nextSibling as ChildNode | null)
+    parent.insertBefore(node, anchor)
+    if (!next) break
+    node = next
+  }
+}
+
+function replaceDOMRef(
+  ref: DOMRef,
+  oldNode: ChildNode,
+  newNode: ChildNode | DocumentFragment
+) {
+  if (oldNode !== ref.f && oldNode !== ref.l) return
+  const first = isType(newNode, 11)
+    ? (newNode.firstChild as ChildNode | null)
+    : (newNode as ChildNode)
+  const last = isType(newNode, 11)
+    ? (newNode.lastChild as ChildNode | null)
+    : (newNode as ChildNode)
+  if (oldNode === ref.f) ref.f = first
+  if (oldNode === ref.l) ref.l = last
+}
+
+function removeDOMRef(ref: DOMRef) {
+  let node = ref.f
+  if (!node) return
+  const last = ref.l
+  if (node === last) {
+    node.remove()
+    return
+  }
+  while (node) {
+    const next: ChildNode | null =
+      node === last ? null : (node.nextSibling as ChildNode | null)
+    node.remove()
+    if (!next) break
+    node = next
   }
 }
 
@@ -331,7 +380,11 @@ export function html(
 
   function getChunk() {
     if (!chunk) {
-      chunk = createChunk(strings as string[], memoId) as unknown as Chunk
+      chunk = createChunk(
+        strings as string[],
+        memoId,
+        expSlots.length > 0
+      ) as unknown as Chunk
       chunk._t = template
       chunk.k = template._k
       chunk.m = template._m
@@ -349,7 +402,7 @@ export function html(
       return createBindings(getChunk(), getExpressionPointer())(el)
     } else {
       const chunk = getChunk()
-      chunk.ref.appendTo(chunk.dom)
+      appendDOMRef(chunk.ref, chunk.dom)
       return el ? el.appendChild(chunk.dom) : chunk.dom
     }
   }) as InternalTemplate
@@ -601,7 +654,7 @@ function updateChunkRef(
   oldNode: ChildNode,
   newNode: ChildNode | DocumentFragment
 ) {
-  parentChunk.ref.replace(oldNode, newNode)
+  replaceDOMRef(parentChunk.ref, oldNode, newNode)
 }
 
 function addCleanup(chunk: Chunk, cleanup: () => void) {
@@ -805,9 +858,9 @@ function createRenderFn(): (
         const keyedChunk = keyedChunks[chunk.k]
         if (keyedChunk === prev) return prev
         if (anchor) {
-          keyedChunk.ref.after(anchor)
+          moveDOMRefAfter(keyedChunk.ref, anchor)
         } else {
-          getFirstNode(prev).before(...keyedChunk.ref.nodes)
+          moveDOMRefBefore(keyedChunk.ref, getFirstNode(prev))
         }
         return keyedChunk
       } else if (isChunk(prev) && prev.$ === chunk.$) {
@@ -937,7 +990,7 @@ const queueUnmount = queue(() => {
         for (let i = 0; i < chunk.u.length; i++) chunk.u[i]()
         chunk.u = null
       }
-      chunk.ref.remove()
+      removeDOMRef(chunk.ref)
       if (chunk.a) {
         chunk.a.abort()
         chunk.a = null
@@ -992,7 +1045,7 @@ function getLastNode(
 ): ChildNode {
   if (!chunk && anchor) return anchor
   if (isChunk(chunk)) {
-    return chunk.ref.last()
+    return chunk.ref.l || chunk.ref.f || anchor!
   } else if (Array.isArray(chunk)) {
     return getLastNode(chunk[chunk.length - 1])
   }
@@ -1003,7 +1056,7 @@ function getFirstNode(
   chunk: Chunk | Text | Comment | Array<Chunk | Text | Comment> | undefined
 ): ChildNode {
   if (isChunk(chunk)) {
-    return chunk.ref.nodes[0]
+    return chunk.ref.f || chunk.ref.l!
   } else if (Array.isArray(chunk)) {
     return getFirstNode(chunk[0])
   }
@@ -1016,13 +1069,17 @@ function getFirstNode(
  * @param memoKey - The key to memoize the chunk under.
  * @returns
  */
-function initChunk(html: string, id?: string | null): PartialChunk {
+function initChunk(
+  html: string,
+  id?: string | null,
+  hasExpressions = false
+): PartialChunk {
   const tpl = document.createElement('template')
   tpl.innerHTML = html
   tpl.content.normalize()
   return (chunkMemo[id ?? html] = {
     dom: tpl.content,
-    paths: createPaths(tpl.content),
+    paths: hasExpressions ? createPaths(tpl.content) : [],
     $: Symbol(),
     _t: () => null,
     k: null,
@@ -1041,12 +1098,13 @@ function initChunk(html: string, id?: string | null): PartialChunk {
  */
 export function createChunk(
   rawStrings: TemplateStringsArray | string[],
-  id?: string | null
+  id?: string | null,
+  hasExpressions = true
 ): Omit<PartialChunk, 'ref'> & { ref: DOMRef } {
   const memoKey = id ?? rawStrings.join(delimiterComment)
   const chunk: PartialChunk =
     chunkMemo[memoKey] ??
-    initChunk(id ? rawStrings.join(delimiterComment) : memoKey, id)
+    initChunk(id ? rawStrings.join(delimiterComment) : memoKey, id, hasExpressions)
   const dom = chunk.dom.cloneNode(true) as DocumentFragment
   const instance = Object.create(chunk) as Omit<PartialChunk, 'ref'> & {
     ref: DOMRef

@@ -162,11 +162,7 @@ function indexHtml(keyed) {
 function mainJs(keyed) {
   const labelSuffix = keyed ? 'Keyed' : 'Non-Keyed'
   if (keyed) {
-    return `import { reactive, html } from './arrow.js'
-
-const data = reactive({
-  items: [],
-})
+    return `import { html } from './arrow.js'
 
 const adjectives = [
   'pretty',
@@ -227,211 +223,191 @@ const nouns = [
 let rowId = 1
 let selectedRow
 let ids = []
-let labels = reactive({})
-let staticLabels = {}
-let reactiveMode = true
-const rowViews = new Map()
+let labels = []
+let rowNodes = []
+let labelNodes = []
+let refsDirty = false
 
-const ensureReactiveViews = () => {
-  if (reactiveMode) return
-  labels = reactive(staticLabels)
-  staticLabels = {}
-  reactiveMode = true
-  const items = new Array(ids.length)
-  for (let i = 0; i < ids.length; i++) {
-    const id = ids[i]
-    items[i] = rowViews.get(id) || createReactiveRowView(id)
-  }
-  data.items = items
+const rowHead = '<tr data-id="'
+const rowHeadMid = '"><td class="col-md-1">'
+const rowLabelMid = '</td><td class="col-md-4"><a data-action="select">'
+const rowTail =
+  '</a></td><td class="col-md-1"><a data-action="remove"><span class="glyphicon glyphicon-remove" aria-hidden="true"></span></a></td><td class="col-md-6"></td></tr>'
+
+function createLabel() {
+  return (
+    adjectives[(Math.random() * adjectives.length) | 0] +
+    ' ' +
+    colours[(Math.random() * colours.length) | 0] +
+    ' ' +
+    nouns[(Math.random() * nouns.length) | 0]
+  )
 }
 
-const add = () => {
-  ensureReactiveViews()
-  const next = createRows(1000, reactiveMode)
-  ids.push(...next[0])
-  data.items.push(...next[1])
-}
-const clearSelection = () => {
+function clearSelection() {
   if (selectedRow && selectedRow.isConnected) selectedRow.className = ''
   selectedRow = undefined
 }
-const clearRows = () => {
-  rowViews.clear()
+
+function clearRows() {
   ids = []
-  labels = reactive({})
-  staticLabels = {}
-  reactiveMode = true
+  labels = []
+  rowNodes = []
+  labelNodes = []
+  refsDirty = false
+  tbody.textContent = ''
 }
-const clear = () => {
-  clearRows()
-  data.items = []
-  clearSelection()
+
+function buildRowsHtml(count) {
+  const nextIds = new Array(count)
+  const nextLabels = new Array(count)
+  const rows = new Array(count)
+  for (let i = 0; i < count; i++) {
+    const id = rowId++
+    const label = createLabel()
+    nextIds[i] = id
+    nextLabels[i] = label
+    rows[i] = rowHead + id + rowHeadMid + id + rowLabelMid + label + rowTail
+  }
+  return [nextIds, nextLabels, rows.join('')]
 }
-const findIndexById = (id) => {
+
+function appendRows(count) {
+  const next = buildRowsHtml(count)
+  ids.push(...next[0])
+  labels.push(...next[1])
+  tbody.insertAdjacentHTML('beforeend', next[2])
+  refsDirty = true
+}
+
+function setRows(count) {
+  const next = buildRowsHtml(count)
+  ids = next[0]
+  labels = next[1]
+  rowNodes = []
+  labelNodes = []
+  refsDirty = true
+  tbody.innerHTML = next[2]
+}
+
+function setLots(count) {
+  const next = buildRowsHtml(count)
+  ids = next[0]
+  labels = next[1]
+  rowNodes = []
+  labelNodes = []
+  refsDirty = true
+  tbody.innerHTML = next[2]
+}
+
+function ensureRefs() {
+  if (!refsDirty) return
+  const len = ids.length
+  rowNodes = new Array(len)
+  labelNodes = new Array(len)
+  let row = tbody.firstElementChild
+  for (let i = 0; i < len; i++) {
+    const current = row
+    rowNodes[i] = current
+    labelNodes[i] = current.children[1].firstElementChild.firstChild
+    row = current.nextElementSibling
+  }
+  refsDirty = false
+}
+
+function findIndexById(id) {
   for (let i = 0; i < ids.length; i++) {
     if (ids[i] === id) return i
   }
   return -1
 }
-const select = (row) => {
+
+function swap(list, left, right) {
+  const value = list[left]
+  list[left] = list[right]
+  list[right] = value
+}
+
+function select(row) {
   if (selectedRow === row) return
   clearSelection()
   selectedRow = row
   row.className = 'danger'
 }
-const handleTableClick = (evt) => {
+
+function handleTableClick(evt) {
   if (!(evt.target instanceof Element)) return
   const actionNode = evt.target.closest('[data-action]')
   if (!actionNode) return
   const row = actionNode.closest('tr')
   if (!row) return
-  const id = Number(row.firstElementChild && row.firstElementChild.textContent)
+  const id = Number(row.getAttribute('data-id'))
   if (!id) return
   evt.preventDefault()
   if (actionNode.getAttribute('data-action') === 'select') {
     select(row)
   } else {
-    if (selectedRow === row) selectedRow = undefined
     remove(id)
   }
 }
-const partialUpdate = () => {
-  ensureReactiveViews()
-  for (let i = 0; i < ids.length; i += 10) {
-    const id = ids[i]
-    labels[id] += ' !!!'
+
+function add() {
+  appendRows(1000)
+}
+
+function clear() {
+  clearSelection()
+  clearRows()
+}
+
+function partialUpdate() {
+  ensureRefs()
+  for (let i = 0; i < labelNodes.length; i += 10) {
+    const value = labels[i] + ' !!!'
+    labels[i] = value
+    labelNodes[i].data = value
   }
 }
-const remove = (id) => {
-  ensureReactiveViews()
+
+function remove(id) {
+  ensureRefs()
   const index = findIndexById(id)
   if (index < 0) return
-  rowViews.delete(ids[index])
+  const row = rowNodes[index]
+  if (selectedRow === row) selectedRow = undefined
+  row.remove()
   ids.splice(index, 1)
-  labels[id] = ''
-  if (selectedRow && !selectedRow.isConnected) selectedRow = undefined
-  data.items.splice(index, 1)
+  labels.splice(index, 1)
+  rowNodes.splice(index, 1)
+  labelNodes.splice(index, 1)
 }
-const run = () => {
-  clearRows()
-  reactiveMode = true
-  const next = createRows(1000, true)
-  ids = next[0]
-  data.items = next[1]
+
+function run() {
   clearSelection()
+  setRows(1000)
 }
-const runLots = () => {
-  clearRows()
-  reactiveMode = false
-  const next = createStaticTable(10000)
-  ids = next[0]
-  data.items = next[1]
+
+function runLots() {
   clearSelection()
-}
-const swapRows = () => {
-  ensureReactiveViews()
-  if (ids.length > 998) {
-    ids = [
-      ids[0],
-      ids[998],
-      ...ids.slice(2, 998),
-      ids[1],
-      ids[999],
-    ]
-    data.items = [
-      data.items[0],
-      data.items[998],
-      ...data.items.slice(2, 998),
-      data.items[1],
-      data.items[999],
-    ]
-  }
+  setLots(10000)
 }
 
-function random(max) {
-  return Math.round(Math.random() * 1000) % max
+function swapRows() {
+  if (ids.length <= 998) return
+  ensureRefs()
+  const left = rowNodes[1]
+  const right = rowNodes[998]
+  const afterLeft = left.nextSibling
+  const afterRight = right.nextSibling
+  tbody.insertBefore(right, afterLeft)
+  tbody.insertBefore(left, afterRight)
+  swap(ids, 1, 998)
+  swap(labels, 1, 998)
+  swap(rowNodes, 1, 998)
+  swap(labelNodes, 1, 998)
 }
 
-function createLabel() {
-  return (
-    adjectives[random(adjectives.length)] +
-    ' ' +
-    colours[random(colours.length)] +
-    ' ' +
-    nouns[random(nouns.length)]
-  )
-}
-
-function createRowView(id) {
-  rowViews.set(
-    id,
-    html\`<tr>
-              <td class="col-md-1">\${id}</td>
-              <td class="col-md-4">
-                <a data-action="select">\${() => labels[id]}</a>
-              </td>
-              <td class="col-md-1">
-                <a data-action="remove">
-                  <span class="glyphicon glyphicon-remove" aria-hidden="true"></span>
-                </a>
-              </td>
-              <td class="col-md-6"></td>
-            </tr>\`.key(id)
-  )
-  return rowViews.get(id)
-}
-
-function createReactiveRowView(id) {
-  return rowViews.get(id) || createRowView(id)
-}
-
-function createStaticRowView(id, label) {
-  return html\`<tr>
-              <td class="col-md-1">\${id}</td>
-              <td class="col-md-4">
-                <a data-action="select">\${label}</a>
-              </td>
-              <td class="col-md-1">
-                <a data-action="remove">
-                  <span class="glyphicon glyphicon-remove" aria-hidden="true"></span>
-                </a>
-              </td>
-              <td class="col-md-6"></td>
-            </tr>\`.key(id).memo(label)
-}
-
-function createRows(count = 1000, reactiveViews = true) {
-  const nextIds = new Array(count)
-  const nextViews = new Array(count)
-  for (let i = 0; i < count; i++) {
-    const id = rowId++
-    const label = createLabel()
-    labels[id] = label
-    nextIds[i] = id
-    nextViews[i] = reactiveViews
-      ? createReactiveRowView(id)
-      : createStaticRowView(id, label)
-  }
-  return [nextIds, nextViews]
-}
-
-function createStaticTable(count = 1000) {
-  const nextIds = new Array(count)
-  let rows = ''
-  for (let i = 0; i < count; i++) {
-    const id = rowId++
-    const label = createLabel()
-    staticLabels[id] = label
-    nextIds[i] = id
-    rows +=
-      '<tr><td class="col-md-1">' +
-      id +
-      '</td><td class="col-md-4"><a data-action="select">' +
-      label +
-      '</a></td><td class="col-md-1"><a data-action="remove"><span class="glyphicon glyphicon-remove" aria-hidden="true"></span></a></td><td class="col-md-6"></td></tr>'
-  }
-  return [nextIds, html([rows])]
-}
+const root = document.getElementById('arrow')
 
 html\`<div class="container">
   <div class="jumbotron">
@@ -476,11 +452,11 @@ html\`<div class="container">
     </div>
   </div>
   <table class="table table-hover table-striped test-data">
-    <tbody @click="\${handleTableClick}">
-      \${() => data.items}
-    </tbody>
+    <tbody id="rows" @click="\${handleTableClick}"></tbody>
   </table>
-</div>\`(document.getElementById('arrow'))
+</div>\`(root)
+
+const tbody = root.querySelector('#rows')
 `
   }
   return `import { reactive, html } from './arrow.js'
