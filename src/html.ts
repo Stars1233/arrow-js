@@ -2,6 +2,11 @@ import { watch } from './reactive'
 import { isChunk, isTpl, queue } from './common'
 import { setAttr } from './dom'
 import {
+  createPropsProxy,
+  isCmp,
+} from './component'
+import type { ComponentCall } from './component'
+import {
   expressionPool,
   onExpressionUpdate,
   releaseExpressions,
@@ -9,7 +14,7 @@ import {
   updateExpressions,
 } from './expressions'
 /**
- * An arrow template one of the three primary ArrowJS utilities. Specifically,
+ * An arrow template, one of ArrowJS's core rendering utilities. Specifically,
  * templates are functions that return a function which mounts the template to
  * a given parent node. However, the template also has some other properties on
  * it like `.key` and `.isT`.
@@ -67,8 +72,9 @@ export type ArrowRenderable =
   | boolean
   | null
   | undefined
+  | ComponentCall
   | ArrowTemplate
-  | Array<string | number | ArrowTemplate>
+  | Array<string | number | boolean | ComponentCall | ArrowTemplate>
 
 /**
  * A reactive function is a function that is bound to a template. It is the
@@ -168,6 +174,10 @@ export interface Chunk {
    * Cleanup callbacks for reactive bindings in this chunk.
    */
   u?: Array<() => void> | null
+  /**
+   * The stable source box used to update component props without rerunning the factory.
+   */
+  s?: ReturnType<typeof createPropsProxy>[1]
 }
 
 type ChunkProto = Pick<Chunk, 'dom' | 'paths'>
@@ -356,7 +366,7 @@ function createNodeBinding(
 ) {
   let fragment: DocumentFragment | Text
   const expression = expressionPool[expressionPointer]
-  if (isTpl(expression) || Array.isArray(expression)) {
+  if (isCmp(expression) || isTpl(expression) || Array.isArray(expression)) {
     // We are dealing with a template that is not reactive. Render it.
     fragment = createRenderFn()(expression)!
   } else if (typeof expression === 'function') {
@@ -437,7 +447,11 @@ function createRenderFn(): (
       /**
        * Initial render:
        */
-      if (isTpl(renderable)) {
+      if (isCmp(renderable)) {
+        const [fragment, chunk] = renderComponent(renderable)
+        previous = chunk
+        return fragment
+      } else if (isTpl(renderable)) {
         // do things
         const fragment = renderable()
         previous = renderable._c()
@@ -481,7 +495,12 @@ function createRenderFn(): (
           //   3. This is an item that as a memo key, if that memo key matches
           //      the previous item, we perform no operation at all.
           for (; i < renderableLength; i++) {
-            let item: string | number | boolean | ArrowTemplate = renderable[
+            let item:
+              | string
+              | number
+              | boolean
+              | ComponentCall
+              | ArrowTemplate = renderable[
               i
             ] as ArrowTemplate
             const prev: Rendered | undefined = previous[i]
@@ -532,7 +551,7 @@ function createRenderFn(): (
    * @returns
    */
   function renderList(
-    renderable: Array<string | number | boolean | ArrowTemplate>,
+    renderable: Array<string | number | boolean | ComponentCall | ArrowTemplate>,
   ): [DocumentFragment, Rendered[]] {
     const fragment = document.createDocumentFragment()
     if (renderable.length === 0) {
@@ -557,14 +576,44 @@ function createRenderFn(): (
   function patch(
     renderable: Exclude<
       ArrowRenderable,
-      Array<string | number | ArrowTemplate>
+      Array<string | number | boolean | ComponentCall | ArrowTemplate>
     >,
     prev: Chunk | Text | Rendered[],
     anchor?: ChildNode
   ): Chunk | Text | Rendered[] {
     // This is an update:
     const nodeType = (prev as Node).nodeType ?? 0
-    if (!isTpl(renderable) && nodeType === 3) {
+    if (isCmp(renderable)) {
+      const key = renderable.k
+      if (key !== undefined && key in keyedChunks) {
+                const keyedChunk = keyedChunks[key]
+        if (keyedChunk.s?.[1] === renderable.h) {
+          if (keyedChunk.s[0] !== renderable.p) keyedChunk.s[0] = renderable.p
+          if (keyedChunk === prev) return prev
+          if (anchor) {
+            moveDOMRef(keyedChunk.ref, anchor.parentNode, anchor.nextSibling)
+          } else {
+            const target = getNode(prev, undefined, true)
+            moveDOMRef(keyedChunk.ref, target.parentNode, target)
+          }
+          return keyedChunk
+        }
+      } else if (isChunk(prev) && prev.s?.[1] === renderable.h) {
+        if (prev.s[0] !== renderable.p) prev.s[0] = renderable.p
+        if (prev.k !== renderable.k) {
+          forgetChunk(prev)
+          prev.k = renderable.k
+          if (prev.k !== undefined) keyedChunks[prev.k] = prev
+        }
+        return prev
+      }
+      const [fragment, chunk] = renderComponent(renderable)
+      getNode(prev, anchor).after(fragment)
+      forgetChunk(prev)
+      unmount(prev)
+      if (chunk.k !== undefined) keyedChunks[chunk.k] = chunk
+      return chunk
+    } else if (!isTpl(renderable) && nodeType === 3) {
       const value = renderText(renderable)
       if ((prev as Text).data != value) (prev as Text).data = value
       return prev
@@ -604,10 +653,15 @@ function createRenderFn(): (
   }
 
   function mountItem(
-    item: string | number | boolean | ArrowTemplate,
+    item: string | number | boolean | ComponentCall | ArrowTemplate,
     fragment: DocumentFragment
   ): Rendered {
-    if (isTpl(item)) {
+    if (isCmp(item)) {
+      const [inner, chunk] = renderComponent(item)
+      fragment.appendChild(inner)
+      if (chunk.k !== undefined) keyedChunks[chunk.k] = chunk
+      return chunk
+    } else if (isTpl(item)) {
       fragment.appendChild(item())
       const chunk = item._c()
       if (chunk.k !== undefined) keyedChunks[chunk.k] = chunk
@@ -622,6 +676,16 @@ function createRenderFn(): (
     if (isChunk(item) && item.k !== undefined && keyedChunks[item.k] === item) {
       delete keyedChunks[item.k]
     }
+  }
+
+  function renderComponent(renderable: ComponentCall): [DocumentFragment, Chunk] {
+    const [props, box] = createPropsProxy(renderable.p, renderable.h)
+    const template = renderable.h(props)
+    const fragment = template()
+    const chunk = template._c()
+    chunk.s = box
+    chunk.k = renderable.k
+    return [fragment, chunk]
   }
 }
 

@@ -27,13 +27,15 @@ export default function () {
       <p>
         For many applications, these two features are all you need to build
         delightful and complex user interfaces. Need state management? Use a
-        module’s scope. Need components? Use functions. Need routing? The web
-        platform already does this pretty well 😉.
+        module’s scope. Need components? Use functions wrapped with
+        <code>component()</code> when you want stable local component state.
+        Need routing? The web platform already does this pretty well 😉.
       </p>
       <p>Additionally, Arrow boasts a few more important talking points:</p>
       <ul>
         <li>Zero dependencies.</li>
         <li>No build tools required (or even suggested).</li>
+        <li>A tiny API surface: <code>html</code>, <code>reactive</code>, <code>watch</code>, and <code>component</code>.</li>
         <li>
           Less than <code>3KB</code> min+gzip. (22x smaller than this itty bitty gif →
           <img src="${mindBlownUrl}" alt="gif of mind blown individual">)

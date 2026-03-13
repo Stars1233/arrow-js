@@ -11,6 +11,7 @@ const store = reactive({
         { title: 'Reactive (r)', id: 'reactive-data' },
         { title: 'Watch (w)', id: 'watching-data' },
         { title: 'HTML (t)', id: 'templates' },
+        { title: 'Components (c)', id: 'components' },
       ],
     },
     {

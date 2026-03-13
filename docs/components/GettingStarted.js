@@ -2,6 +2,7 @@ import { html } from '@src/index'
 import example from './Example'
 import reactiveData from './ReactiveData'
 import watchingData from './WatchingData'
+import components from './Components'
 import templates from './Templates'
 import InstallationExamples from '../examples/InstallationExamples'
 import examples from './Examples'
@@ -50,6 +51,6 @@ export default function () {
         extension to enable syntax highlighting on <code>html</code> blocks.
       </p>
     </section>
-    ${reactiveData} ${watchingData} ${templates} ${examples}
+    ${reactiveData} ${watchingData} ${templates} ${components} ${examples}
   `
 }

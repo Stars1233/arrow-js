@@ -15,7 +15,7 @@
 - No Virtual DOM.
 - Ultra fast.
 - Zero dependencies.
-- 3 functions.
+- Tiny core API: `html`, `reactive`, `watch`, and `component`.
 - No build tools required (or even suggested).
 - All knowledge is 100% transferable — it's all native JavaScript.
 

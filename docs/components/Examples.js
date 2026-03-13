@@ -35,6 +35,21 @@ export default function () {
       </li>
     </ul>
 
+    <h3>Component Stability</h3>
+    <p>
+      A nested component demo showing stable local state across parent and
+      grandparent rerenders, surrounding shape changes, and full unmounts.
+    </p>
+    <ul>
+      <li><a href="/demos/component-stability.html">Demo</a></li>
+      <li>
+        <a
+          href="https://github.com/justin-schroeder/arrow-js/blob/master/docs/demos/components/component-stability.js"
+          >Source code</a
+        >
+      </li>
+    </ul>
+
     <h3>Dropdown</h3>
     <p>
       A simple synthetic (not a native select element) dropdown list component

@@ -2,6 +2,7 @@ import { html } from '@src/index'
 
 const demos = [
   { href: '/demos/fast-text.html', label: 'DOM Patching' },
+  { href: '/demos/component-stability.html', label: 'Component Stability' },
   { href: '/demos/calculator.html', label: 'Calculator' },
   { href: '/demos/carousel.html', label: 'Carousel' },
   { href: '/demos/dropdowns.html', label: 'Dropdowns' },
