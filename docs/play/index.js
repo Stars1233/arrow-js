@@ -5,6 +5,9 @@ import arrowTypes from './arrow-types.d.ts?raw'
 const MONACO_BASE = 'https://cdn.jsdelivr.net/npm/monaco-editor@0.52.2/min'
 const MONACO_URL = `${MONACO_BASE}/vs`
 const ENTRY_FILE = 'main.ts'
+const DESKTOP_SPLIT_BREAKPOINT = 1080
+const MIN_SPLIT_PANE = 320
+const SPLITTER_SIZE = 7
 const DEFAULT_FILES = [
   [
     'main.ts',
@@ -49,8 +52,17 @@ export const Counter = component(() => {
 
 const state = reactive({
   activeFile: ENTRY_FILE,
+  canResize:
+    typeof window !== 'undefined'
+      ? window.innerWidth > DESKTOP_SPLIT_BREAKPOINT
+      : true,
   copied: false,
+  editorWidth: 0,
+  menuFile: '',
+  menuX: 0,
+  menuY: 0,
   renaming: '',
+  resizing: false,
   files: DEFAULT_FILES.map(([name]) => ({
     errors: 0,
     name,
@@ -163,6 +175,88 @@ const readInitialSnapshot = () => {
 const modelUri = (name) => monaco.Uri.parse(`file:///playground/${name}`)
 
 const getFileState = (name) => state.files.find((file) => file.name === name)
+const isLockedFile = (name) => name === ENTRY_FILE
+
+const closeFileMenu = () => {
+  state.menuFile = ''
+}
+
+const getSplitBounds = () => {
+  const split = document.getElementById('play-split')
+  if (!split) return null
+  const rect = split.getBoundingClientRect()
+  return {
+    left: rect.left,
+    max: Math.max(MIN_SPLIT_PANE, rect.width - SPLITTER_SIZE - MIN_SPLIT_PANE),
+  }
+}
+
+const syncResizeMode = () => {
+  state.canResize = window.innerWidth > DESKTOP_SPLIT_BREAKPOINT
+
+  if (!state.canResize) {
+    state.resizing = false
+    document.documentElement.style.cursor = ''
+    document.body.style.userSelect = ''
+    return
+  }
+
+  if (!state.editorWidth) return
+  const bounds = getSplitBounds()
+  if (!bounds) return
+  if (state.editorWidth > bounds.max) {
+    state.editorWidth = bounds.max
+    editor?.layout()
+  }
+}
+
+const splitStyle = () =>
+  state.canResize && state.editorWidth
+    ? `grid-template-columns:minmax(${MIN_SPLIT_PANE}px, ${state.editorWidth}px) ${SPLITTER_SIZE}px minmax(${MIN_SPLIT_PANE}px, 1fr)`
+    : ''
+
+const startResize = (event) => {
+  if (!state.canResize) return
+  const bounds = getSplitBounds()
+  if (!bounds) return
+
+  event.preventDefault()
+  closeFileMenu()
+  state.resizing = true
+  document.documentElement.style.cursor = 'col-resize'
+  document.body.style.userSelect = 'none'
+  if (event.currentTarget instanceof Element && 'setPointerCapture' in event.currentTarget) {
+    event.currentTarget.setPointerCapture(event.pointerId)
+  }
+
+  const move = (moveEvent) => {
+    state.editorWidth = Math.max(
+      MIN_SPLIT_PANE,
+      Math.min(moveEvent.clientX - bounds.left, bounds.max)
+    )
+    editor?.layout()
+  }
+
+  const stop = () => {
+    state.resizing = false
+    document.documentElement.style.cursor = ''
+    document.body.style.userSelect = ''
+    if (
+      event.currentTarget instanceof Element &&
+      'releasePointerCapture' in event.currentTarget
+    ) {
+      event.currentTarget.releasePointerCapture(event.pointerId)
+    }
+    window.removeEventListener('pointermove', move)
+    window.removeEventListener('pointerup', stop)
+    window.removeEventListener('pointercancel', stop)
+  }
+
+  move(event)
+  window.addEventListener('pointermove', move)
+  window.addEventListener('pointerup', stop)
+  window.addEventListener('pointercancel', stop)
+}
 
 const writeHash = () => {
   const encoded = encodeSnapshot()
@@ -614,6 +708,21 @@ export const ${exportName} = component(() =>
 )`
 }
 
+const createDuplicateName = (name) => {
+  const dot = name.lastIndexOf('.')
+  const stem = dot === -1 ? name : name.slice(0, dot)
+  const ext = dot === -1 ? '' : name.slice(dot)
+  let copyName = `${stem}-copy${ext}`
+  let index = 2
+
+  while (models.has(copyName)) {
+    copyName = `${stem}-copy-${index}${ext}`
+    index++
+  }
+
+  return copyName
+}
+
 const commitRename = (file, newName) => {
   newName = newName.trim()
   if (!newName.endsWith('.ts')) newName += '.ts'
@@ -639,6 +748,7 @@ const commitRename = (file, newName) => {
     return
   }
 
+  if (isLockedFile(file.name)) return
   if (newName === file.name) return
 
   const oldName = file.name
@@ -665,13 +775,27 @@ const commitRename = (file, newName) => {
 }
 
 const removeFile = (name) => {
+  if (isLockedFile(name)) return
   const idx = state.files.findIndex((f) => f.name === name)
   if (idx === -1) return
+  const nextActive =
+    state.activeFile === name
+      ? state.files[idx + 1]?.name || state.files[idx - 1]?.name || ENTRY_FILE
+      : state.activeFile
   state.files.splice(idx, 1)
   const model = models.get(name)
   if (model) model.dispose()
   models.delete(name)
   viewStates.delete(name)
+  if (state.menuFile === name) closeFileMenu()
+
+  if (state.activeFile === name) {
+    state.activeFile = nextActive
+    if (editor && models.has(nextActive)) editor.setModel(models.get(nextActive))
+  }
+
+  scheduleHashSync()
+  scheduleCompile()
 }
 
 const focusRenameInput = () => {
@@ -685,16 +809,51 @@ const focusRenameInput = () => {
 }
 
 const startRename = (name) => {
+  if (isLockedFile(name)) return
+  closeFileMenu()
   state.renaming = name
   focusRenameInput()
 }
 
+const duplicateFile = (name) => {
+  if (!monaco) return
+  const source = models.get(name)
+  if (!source) return
+
+  const copyName = createDuplicateName(name)
+  const copyModel = monaco.editor.createModel(
+    source.getValue(),
+    'typescript',
+    modelUri(copyName)
+  )
+  const index = state.files.findIndex((file) => file.name === name)
+
+  models.set(copyName, copyModel)
+  state.files.splice(index + 1, 0, {
+    errors: 0,
+    name: copyName,
+  })
+  closeFileMenu()
+  switchFile(copyName)
+  scheduleHashSync()
+  scheduleCompile()
+}
+
 const addFile = () => {
   if (!monaco) return
+  closeFileMenu()
   const placeholder = 'Untitled.ts'
   state.files.push({ errors: 0, name: placeholder })
   state.renaming = placeholder
   focusRenameInput()
+}
+
+const openFileMenu = (event, name) => {
+  event.preventDefault()
+  state.renaming = ''
+  state.menuFile = name
+  state.menuX = Math.max(8, Math.min(event.clientX, window.innerWidth - 168))
+  state.menuY = Math.max(8, Math.min(event.clientY, window.innerHeight - 120))
 }
 
 const onFrameMessage = (event) => {
@@ -831,60 +990,115 @@ const shell = html`
                 class="play-file"
                 data-active="${() => String(file.name === state.activeFile)}"
                 @click="${() => {
+                  closeFileMenu()
                   if (state.renaming !== file.name) switchFile(file.name)
                 }}"
+                @contextmenu="${(event) => openFileMenu(event, file.name)}"
                 @dblclick="${(e) => {
                   e.preventDefault()
                   startRename(file.name)
                 }}"
               >
-                <span class="play-file-icon">TS</span>
-                ${() =>
-                  state.renaming === file.name
-                    ? html`<input
-                        class="play-rename-input"
-                        value="${file.name}"
-                        @blur="${(e) => commitRename(file, e.target.value)}"
-                        @keydown="${(e) => {
-                          if (e.key === 'Enter') e.target.blur()
-                          if (e.key === 'Escape') {
-                            state.renaming = ''
-                            if (!models.has(file.name)) removeFile(file.name)
-                          }
-                        }}"
-                      />`
-                    : html`<span class="play-file-name">${file.name}</span>`}
+                <span class="play-file-main">
+                  <span class="play-file-icon">TS</span>
+                  ${() =>
+                    state.renaming === file.name
+                      ? html`<input
+                          class="play-rename-input"
+                          value="${file.name}"
+                          @blur="${(e) => commitRename(file, e.target.value)}"
+                          @keydown="${(e) => {
+                            if (e.key === 'Enter') e.target.blur()
+                            if (e.key === 'Escape') {
+                              state.renaming = ''
+                              if (!models.has(file.name)) removeFile(file.name)
+                            }
+                          }}"
+                        />`
+                      : html`<span class="play-file-name">${file.name}</span>`}
+                </span>
                 ${() =>
                   file.errors && state.renaming !== file.name
                     ? html`<span class="play-file-badge"
                         >${() => file.errors}</span
                       >`
                     : ''}
-              </div>`
+          </div>`
             )}
         </div>
       </aside>
-      <section class="play-editor-pane">
-        <div class="play-pane-header">
-          <span class="play-pane-tab">
-            <span class="play-file-icon">TS</span>
-            ${() => state.activeFile}
-          </span>
-        </div>
-        <div id="play-editor" class="play-editor"></div>
-      </section>
-      <section class="play-preview-pane">
-        <div class="play-pane-header">
-          <span class="play-pane-label">Preview</span>
-        </div>
-        <iframe
-          id="play-preview"
-          class="play-preview"
-          title="Arrow Playground Preview"
-          src="${new URL('./preview.html', window.location.href).pathname}"
-        ></iframe>
-      </section>
+      <div id="play-split" class="play-split" style="${splitStyle}">
+        <section class="play-editor-pane">
+          <div class="play-pane-header">
+            <span class="play-pane-tab">
+              <span class="play-file-icon">TS</span>
+              ${() => state.activeFile}
+            </span>
+          </div>
+          <div id="play-editor" class="play-editor"></div>
+        </section>
+        <div
+          class="play-splitter"
+          data-active="${() => String(state.resizing)}"
+          @pointerdown="${startResize}"
+          aria-label="Resize editor and preview panels"
+          role="separator"
+        ></div>
+        <section class="play-preview-pane">
+          <div class="play-pane-header">
+            <span class="play-pane-label">Preview</span>
+          </div>
+          <iframe
+            id="play-preview"
+            class="play-preview"
+            title="Arrow Playground Preview"
+            src="${new URL('./preview.html', window.location.href).pathname}"
+          ></iframe>
+        </section>
+        ${() =>
+          state.resizing
+            ? html`<div class="play-resize-capture"></div>`
+            : ''}
+      </div>
     </main>
+    ${() =>
+      state.menuFile
+        ? html`<div
+            class="play-context-menu"
+            style="${() => `left:${state.menuX}px; top:${state.menuY}px`}"
+            @contextmenu="${(event) => event.preventDefault()}"
+          >
+            <button
+              class="play-context-item"
+              data-disabled="${() => String(isLockedFile(state.menuFile))}"
+              @click="${() => {
+                if (isLockedFile(state.menuFile)) return
+                startRename(state.menuFile)
+              }}"
+            >
+              Rename
+            </button>
+            <button
+              class="play-context-item"
+              @click="${() => duplicateFile(state.menuFile)}"
+            >
+              Duplicate
+            </button>
+            <button
+              class="play-context-item"
+              data-danger="true"
+              data-disabled="${() => String(isLockedFile(state.menuFile))}"
+              @click="${() => {
+                if (isLockedFile(state.menuFile)) return
+                const name = state.menuFile
+                closeFileMenu()
+                removeFile(name)
+              }}"
+            >
+              Delete
+            </button>
+          </div>`
+        : ''}
   </div>
 `
 
@@ -894,11 +1108,25 @@ previewFrame = document.getElementById('play-preview')
 
 window.addEventListener('message', onFrameMessage)
 window.addEventListener('hashchange', applyHashChange)
+window.addEventListener('mousedown', (event) => {
+  if (!state.menuFile) return
+  if (event.target instanceof Element && event.target.closest('.play-context-menu'))
+    return
+  closeFileMenu()
+})
+window.addEventListener('keydown', (event) => {
+  if (event.key === 'Escape') closeFileMenu()
+})
+window.addEventListener('resize', () => {
+  syncResizeMode()
+  editor?.layout()
+})
 new MutationObserver(updateEditorTheme).observe(document.documentElement, {
   attributeFilter: ['data-theme'],
   attributes: true,
 })
 
+syncResizeMode()
 initMonaco().catch((error) => {
   window.alert(error.message || String(error))
 })
