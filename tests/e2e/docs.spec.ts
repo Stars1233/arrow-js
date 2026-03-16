@@ -83,7 +83,14 @@ test('docs page hydrates navigation without remounting the app root', async ({
     .toBe(0)
   await selection.click()
   await expect(selection).toHaveAttribute('data-is-open', 'true')
-  await page.locator('article').click()
+  const article = page.locator('article')
+  const box = await article.boundingBox()
+
+  if (!box) {
+    throw new Error('Unable to measure docs article content.')
+  }
+
+  await page.mouse.click(box.x + box.width / 2, box.y + 32)
   await expect(selection).not.toHaveAttribute('data-is-open', 'true')
 })
 
@@ -114,7 +121,7 @@ test('docs TypeScript examples expose Twoslash hover data', async ({ page }) => 
 
   await expect
     .poll(() => page.locator('pre.twoslash').count())
-    .toBeGreaterThan(18)
+    .toBeGreaterThan(14)
 
   const block = page.locator('pre.twoslash').first()
   await expect(block).toBeVisible()

@@ -1,6 +1,6 @@
 {
   "name": "@arrow-js/ssr",
-  "private": true,
+  "version": "1.0.0-alpha.9",
   "type": "module",
   "exports": {
     ".": "./src/index.ts"

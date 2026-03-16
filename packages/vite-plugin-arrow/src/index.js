@@ -23,14 +23,44 @@ export function arrow(options = {}) {
     config() {
       return {
         resolve: {
-          alias: {
-            '@src': coreAlias,
-            '@arrow-js/core': path.resolve(coreAlias, 'index.ts'),
-            '@arrow-js/framework': frameworkAlias,
-            '@arrow-js/ssr': ssrAlias,
-            '@arrow-js/hydrate': hydrateAlias,
-            '@arrow-js/compiler': compilerAlias,
-          },
+          alias: [
+            {
+              find: '@src',
+              replacement: coreAlias,
+            },
+            {
+              find: '@arrow-js/core/internal',
+              replacement: path.resolve(coreAlias, 'internal.ts'),
+            },
+            {
+              find: '@arrow-js/core',
+              replacement: path.resolve(coreAlias, 'index.ts'),
+            },
+            {
+              find: '@arrow-js/framework/internal',
+              replacement: path.resolve(workspaceRoot, 'packages/framework/src/internal.ts'),
+            },
+            {
+              find: '@arrow-js/framework/ssr',
+              replacement: path.resolve(workspaceRoot, 'packages/framework/src/ssr.ts'),
+            },
+            {
+              find: '@arrow-js/framework',
+              replacement: frameworkAlias,
+            },
+            {
+              find: '@arrow-js/ssr',
+              replacement: ssrAlias,
+            },
+            {
+              find: '@arrow-js/hydrate',
+              replacement: hydrateAlias,
+            },
+            {
+              find: '@arrow-js/compiler',
+              replacement: compilerAlias,
+            },
+          ],
         },
         optimizeDeps: {
           exclude: [

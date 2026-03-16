@@ -1,5 +1,5 @@
 import { html } from '@arrow-js/core'
-import type { ArrowTemplate } from '../../core/src/html'
+import type { ArrowTemplate } from '@arrow-js/core/internal'
 import { getRenderContext } from './context'
 import { toTemplate } from './render'
 

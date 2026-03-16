@@ -1,4 +1,4 @@
-import '../../framework/src/install'
+import '@arrow-js/framework/internal'
 
-export { renderToString, serializePayload } from '../../framework/src/ssr'
-export type { SsrRenderOptions, SsrRenderResult } from '../../framework/src/ssr'
+export { renderToString, serializePayload } from '@arrow-js/framework/ssr'
+export type { SsrRenderOptions, SsrRenderResult } from '@arrow-js/framework/ssr'

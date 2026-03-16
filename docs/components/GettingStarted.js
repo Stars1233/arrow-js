@@ -5,7 +5,6 @@ import watchingData from './WatchingData'
 import components from './Components'
 import templates from './Templates'
 import serverRendering from './ServerRendering'
-import InstallationExamples from '../examples/InstallationExamples'
 import FrameworkExamples from '../examples/FrameworkExamples'
 import examples from './Examples'
 
@@ -36,63 +35,28 @@ export default function () {
     <h2 id="quick-start">Quickstart</h2>
     <section>
       <p>
-        The fastest way into a full Arrow app right now is a Vite 8 project
-        with the SSR and hydration packages installed next to core.
-      </p>
-      <p>
-        These examples use TypeScript and the Vite
-        <code>vanilla-ts</code> starter. Arrow’s packages ship type
-        information, so you can keep the same native-JavaScript model while
-        still getting checked props and editor help.
+        The fastest way into a full Arrow app right now is the Arrow Vite 8
+        scaffold.
       </p>
       <strong>Install:</strong>
       ${example(FrameworkExamples.install, null, 'shell')}
+      <p>
+        The scaffold already includes <code>server.mjs</code>,
+        <code>vite.config.ts</code>, <code>src/entry-server.ts</code>, and
+        <code>src/entry-client.ts</code>. Open <code>src/App.ts</code> and
+        start editing.
+      </p>
       <strong><code>src/App.ts</code></strong>
       ${example(FrameworkExamples.app, null, 'typescript')}
-      <strong><code>src/entry-server.ts</code></strong>
-      ${example(FrameworkExamples.server, null, 'typescript')}
       <p>
-        On the client, read the serialized payload and hydrate the same view:
-      </p>
-      <strong><code>src/entry-client.ts</code></strong>
-      ${example(FrameworkExamples.client, null, 'typescript')}
-      <p>
-        This is the shape used by the docs app itself. The server sends HTML
-        immediately, then the browser hydrates the existing DOM instead of
-        replacing it.
-      </p>
-      <h3>Other Ways to Install Arrow</h3>
-      <p>
-        Arrow still works fine without a build tool. If you only need the core
-        runtime, a simple module import is enough.
-      </p>
-      <strong>From npm:</strong>
-      ${example(InstallationExamples.npm, null, 'shell')}
-      <strong>From Yarn:</strong>
-      ${example(InstallationExamples.yarn, null, 'shell')}
-      <h3>From a CDN</h3>
-      <p>
-        You can install Arrow directly from a CDN. We recommend using
-        <a href="https://esm.sh/">esm.sh</a> since it serves ESM cleanly.
-      </p>
-      ${example(InstallationExamples.cdn, null, 'html')}
-      <h3>On your local filesystem</h3>
-      ${example(InstallationExamples.local, null, 'html')}
-      <h3>Editor support</h3>
-      <p>
-        Since Arrow uses tagged template literals its syntax is very similar to
-        lit-html. Editors that support lit-html will also support Arrow. If you
-        are using VSCode you can install the
-        <a
-          href="https://marketplace.visualstudio.com/items?itemName=bierner.lit-html"
-          >lit-html</a
-        >
-        extension to enable syntax highlighting on <code>html</code> blocks.
+        The exact <code>pnpm create vite@latest ... --template arrow-js</code>
+        flow still depends on Vite shipping an Arrow template upstream. Today,
+        the scaffold lives in <code>create-arrow-js</code>.
       </p>
       <p>
         Arrow also ships TypeScript definitions. If you are using TypeScript,
-        component props, computed values, and the SSR helpers will all surface
-        their types directly in your editor.
+        component props, computed values, and the SSR helpers surface directly
+        in your editor.
       </p>
     </section>
 

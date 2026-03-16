@@ -12,6 +12,10 @@
       "types": "./dist/index.d.ts",
       "import": "./dist/index.mjs"
     },
+    "./internal": {
+      "types": "./src/internal.ts",
+      "import": "./src/internal.ts"
+    },
     "./package.json": "./package.json"
   },
   "type": "module",

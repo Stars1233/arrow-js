@@ -1,53 +1,67 @@
 export default {
-  install: `pnpm create vite@latest arrow-app --template vanilla-ts
+  install: `pnpm create arrow-js@latest arrow-app
 cd arrow-app
-pnpm add @arrow-js/core @arrow-js/framework @arrow-js/ssr @arrow-js/hydrate
-pnpm add -D vite@8`,
+pnpm install
+pnpm dev`,
 
-  app: `import { component, html } from '@arrow-js/core'
+  app: `import { component, html, reactive } from '@arrow-js/core'
 import { boundary } from '@arrow-js/framework'
 
-type WelcomeProps = {
-  message: string
-}
+const WelcomeCard = component(async () => {
+  const message = await Promise.resolve(
+    'SSR waits for async work before the page is sent.'
+  )
 
-const Welcome = component(async ({ message }: WelcomeProps) =>
-  html\`<p>\${message}</p>\`
-)
+  return html\`<p>\${message}</p>\`
+})
 
-export function createApp() {
-  return html\`<main>
+const state = reactive({ count: 2 })
+
+export const App = component(() =>
+  html\`<main>
     <h1>Arrow + Vite 8</h1>
-    \${boundary(Welcome({ message: 'SSR first. Hydrated when the browser boots.' }))}
+    <button @click="\${() => state.count++}">
+      Count \${() => state.count}
+    </button>
+    \${boundary(WelcomeCard())}
   </main>\`
-}`,
+)`,
 
   server: `import { renderToString, serializePayload } from '@arrow-js/ssr'
-import { createApp } from './App'
 
-export async function renderPage(): Promise<string> {
-  const result = await renderToString(createApp())
+declare function createPage(url: string): {
+  html?: string
+  status: number
+  title: string
+  view: unknown
+}
 
-  return \`<!doctype html>
-  <html>
-    <body>
-      <div id="app">\${result.html}</div>
-      \${serializePayload(result.payload)}
-      <script type="module" src="/src/entry-client.ts"></script>
-    </body>
-  </html>\`
+export async function renderPage(url: string) {
+  const page = createPage(url)
+  const result = await renderToString(page.view)
+
+  return {
+    status: page.status,
+    head: \`<title>\${page.title}</title>\`,
+    html: result.html,
+    payloadScript: serializePayload(result.payload),
+  }
 }`,
 
   client: `import { hydrate, readPayload } from '@arrow-js/hydrate'
-import { createApp } from './App'
 
-const root = document.getElementById('app')
+declare function createPage(url: string): {
+  view: unknown
+}
+
+const payload = readPayload()
+const root = document.getElementById(payload.rootId ?? 'app')
 
 if (!root) {
   throw new Error('Missing #app root')
 }
 
-await hydrate(root, createApp(), readPayload())`,
+await hydrate(root, createPage(window.location.pathname).view, payload)`,
 
   asyncComponent: `import { component, html } from '@arrow-js/core'
 import { boundary } from '@arrow-js/framework'

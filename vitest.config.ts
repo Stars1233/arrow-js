@@ -3,18 +3,48 @@ import { defineConfig } from 'vitest/config'
 
 export default defineConfig({
   resolve: {
-    alias: {
-      '@src': path.resolve(__dirname, 'packages/core/src'),
-      '@arrow-js/core': path.resolve(__dirname, 'packages/core/src/index.ts'),
-      '@arrow-js/framework': path.resolve(__dirname, 'packages/framework/src/index.ts'),
-      '@arrow-js/ssr': path.resolve(__dirname, 'packages/ssr/src/index.ts'),
-      '@arrow-js/hydrate': path.resolve(__dirname, 'packages/hydrate/src/index.ts'),
-      '@arrow-js/compiler': path.resolve(__dirname, 'packages/compiler/src/index.ts'),
-      '@arrow-js/vite-plugin-arrow': path.resolve(
-        __dirname,
-        'packages/vite-plugin-arrow/src/index.js'
-      ),
-    },
+    alias: [
+      {
+        find: '@src',
+        replacement: path.resolve(__dirname, 'packages/core/src'),
+      },
+      {
+        find: '@arrow-js/core/internal',
+        replacement: path.resolve(__dirname, 'packages/core/src/internal.ts'),
+      },
+      {
+        find: '@arrow-js/core',
+        replacement: path.resolve(__dirname, 'packages/core/src/index.ts'),
+      },
+      {
+        find: '@arrow-js/framework/internal',
+        replacement: path.resolve(__dirname, 'packages/framework/src/internal.ts'),
+      },
+      {
+        find: '@arrow-js/framework/ssr',
+        replacement: path.resolve(__dirname, 'packages/framework/src/ssr.ts'),
+      },
+      {
+        find: '@arrow-js/framework',
+        replacement: path.resolve(__dirname, 'packages/framework/src/index.ts'),
+      },
+      {
+        find: '@arrow-js/ssr',
+        replacement: path.resolve(__dirname, 'packages/ssr/src/index.ts'),
+      },
+      {
+        find: '@arrow-js/hydrate',
+        replacement: path.resolve(__dirname, 'packages/hydrate/src/index.ts'),
+      },
+      {
+        find: '@arrow-js/compiler',
+        replacement: path.resolve(__dirname, 'packages/compiler/src/index.ts'),
+      },
+      {
+        find: '@arrow-js/vite-plugin-arrow',
+        replacement: path.resolve(__dirname, 'packages/vite-plugin-arrow/src/index.js'),
+      },
+    ],
   },
   test: {
     environment: 'jsdom',

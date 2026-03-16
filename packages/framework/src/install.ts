@@ -1,6 +1,4 @@
-import {
-  installAsyncComponentInstaller,
-} from '../../core/src/component'
+import { installAsyncComponentInstaller } from '@arrow-js/core/internal'
 import { asyncComponent } from './async'
 
 let installed = false

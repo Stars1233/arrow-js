@@ -1,5 +1,5 @@
-import { adoptChunk } from '../../core/src/html'
-import type { ArrowTemplate, ParentNode } from '../../core/src/html'
+import { adoptChunk } from '@arrow-js/core/internal'
+import type { ArrowTemplate, ParentNode as ArrowParentNode } from '@arrow-js/core/internal'
 
 export interface HydrationStats {
   mismatches: number
@@ -7,8 +7,8 @@ export interface HydrationStats {
 
 export function hydrateTemplate(
   template: ArrowTemplate,
-  parent: ParentNode,
-  sourceRoot?: ParentNode,
+  parent: ArrowParentNode,
+  sourceRoot?: ArrowParentNode,
   stats?: HydrationStats
 ): boolean {
   const stage = sourceRoot ?? document.createDocumentFragment()
@@ -28,7 +28,7 @@ export function hydrateTemplate(
 
 function createNodeMap(
   sourceNodes: NodeListOf<ChildNode> | NodeList | ChildNode[],
-  targetParent: ParentNode
+  targetParent: ArrowParentNode
 ): { map: WeakMap<Node, Node>; mismatches: number } | null {
   const source = Array.from(sourceNodes)
   const map = new WeakMap<Node, Node>()
@@ -45,7 +45,7 @@ function createNodeMap(
 
 function reconcileChildNodes(
   sourceChildren: Node[],
-  targetParent: ParentNode,
+  targetParent: ArrowParentNode,
   map: WeakMap<Node, Node>
 ): number {
   alignTargetChildNodes(sourceChildren, targetParent)
@@ -146,7 +146,7 @@ function reconcileNode(
   if (source.nodeType === Node.ELEMENT_NODE && target.nodeType === Node.ELEMENT_NODE) {
     return {
       reused: true,
-      mismatches: reconcileChildNodes(Array.from(source.childNodes), target as ParentNode, map),
+      mismatches: reconcileChildNodes(Array.from(source.childNodes), target as ArrowParentNode, map),
     }
   }
 

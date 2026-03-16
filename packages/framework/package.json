@@ -1,11 +1,15 @@
 {
   "name": "@arrow-js/framework",
-  "private": true,
+  "version": "1.0.0-alpha.9",
   "type": "module",
   "exports": {
-    ".": "./src/index.ts"
+    ".": "./src/index.ts",
+    "./internal": "./src/internal.ts",
+    "./ssr": "./src/ssr.ts"
   },
   "dependencies": {
-    "@arrow-js/core": "workspace:*"
+    "@arrow-js/core": "workspace:*",
+    "@types/jsdom": "^28.0.0",
+    "jsdom": "^26.1.0"
   }
 }
