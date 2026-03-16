@@ -7,129 +7,55 @@ export default function () {
   return html`
     <h2 id="templates">Templates <code>t</code></h2>
     <section>
-      <p>
-        Arrow uses a <a href="https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Template_literals">tagged template literal</a>
-        to declaratively render content. To tag a template literal as an
-        <code>ArrowTemplate</code>, prefix the tick marks with the
-        <code>html</code> function (<code>t</code> for shorthand). To mount a
-        template to the DOM, you call the return value with an
-        <code>Element</code> as the argument.
-      </p>
-      ${example(TemplateExamples.intro.code, TemplateExamples.intro.example)}
-      <p>
-        There are some interesting things about this simple example.
-      </p>
+      <p><code>html\`...\`</code> - create a mountable template</p>
       <ul>
-        <li>You can use <code>html</code> without <code>reactive</code> or&nbsp;<code>watch</code>.</li>
-        <li>You can use HTML.</li>
-        <li>There is no need for root elements or fragment tags.</li>
-        <li>Templates are portable (even though we chose to mount our template to the DOM in this example, we could have passed it around like any variable).</li>
+        <li>Templates can be mounted directly, passed around, or returned from components.</li>
+        <li>Arrow is static by default. Expressions only stay live when they are functions.</li>
+        <li>Templates can render text, attributes, properties, lists, nested templates, and events.</li>
       </ul>
-      <p>
-        Since template literals are a native JavaScript feature, you probably
-        already know you can use placeholders denoted by
-        <code>\${expression}</code>. Arrow uses this expression placeholder to
-        render variable and reactive content.
-      </p>
-      <h3>Reactivity</h3>
-      <p class="key-concept">
-        Arrow makes a distinction between <strong>static expressions</strong>,
-        and <strong>reactive expressions</strong>. Reactive expressions are
-        <em>callable functions</em>, everything else is a static expression.
-      </p>
+      ${example(TemplateExamples.intro.code, TemplateExamples.intro.example, 'typescript')}
+      <p>Static expressions render once. Function expressions stay live.</p>
       ${example(
         TemplateExamples.expressions.code,
-        TemplateExamples.expressions.example
+        TemplateExamples.expressions.example,
+        'typescript'
       )}
-      <p>
-        In other words, <strong>Arrow is static by default and reactive by choice</strong>.
-        This is an intentional decision that improves performance and helps
-        developers make intentional choices about which pieces of their app
-        <em>should</em> be reactive. Template expressions will update
-        automatically ("react") when 2 conditions are met:
-        <ol>
-          <li>
-            The template expression is a function.
-          </li>
-          <li>
-            The template expression uses
-            <a href="#reactive-data">reactive data</a>.
-          </li>
-        </ol>
-      </p>
       ${collapsable(html`
         <p>
-          In the real world, you’ll find a large swath of dynamic data does not
-          need to be "reactive". Let’s say we're building a product page — just
-          because we fetched the product’s data from the back end does not mean
-          the page elements need to be reactive. They should be injected into
-          the DOM only once on initial page load. In fact, most of the page
-          probably shouldn't be reactive.
-        </p>
-        <p>
-          A shopping cart’s details on the other hand probably
-          <em>should</em> be reactive. Which products are in the cart, their
-          quantities, the total price — these are all items that may dynamically
-          change as a user interacts with the page.
+          In practice, most page content is static after first render. Arrow
+          keeps that path cheap and lets you opt into reactivity only for the
+          parts that truly change.
         </p>
       `)}
-      <p>
-        Reactive expressions can be used:
-        <ul>
-          <li>In text content.</li>
-          <li>As the inner content of an <code>Element</code></li>
-          <li>As attribute values.</li>
-        </ul>
-      </p>
-      <p>
-        Reactive expressions <strong>cannot</strong> be used to alter the types
-        of DOM nodes being rendered. This is an invalid template:<br>
-      </p>
-      ${example(TemplateExamples.invalid).error(
+      <p>Reactive expressions can appear in text content, element content, attributes, and properties.</p>
+      <p>They cannot switch an element tag name. Use nested templates instead.</p>
+      ${example(TemplateExamples.invalid, null, 'typescript').error(
         'Don’t use reactive expressions as <code>Element</code> types. Instead use nested templates.'
       )}
       <h3>Attributes</h3>
-      <p>
-        Reactive expressions can be used to alter the value of attributes
-        dynamically by using an expression as the attribute value.
-      </p>
+      <p>Use a function expression to keep an attribute in sync.</p>
       ${example(
         TemplateExamples.attributes.code,
-        TemplateExamples.attributes.example
+        TemplateExamples.attributes.example,
+        'typescript'
       )}
       <aside class="tip">
         Returning <code>false</code> from an attribute expression will remove
         the attribute. This makes it easy to toggle attributes.
       </aside>
       <h3>Properties</h3>
-      <p>
-        In addition to setting an element’s content attributes, you can also set
-        an element’s internal properties (<a href="https://developer.mozilla.org/en-US/docs/Glossary/IDL">IDL attributes</a>)
-        by prefixing an attribute with a dot <code>.</code> (note: this is done
-        automatically for the <code>value</code> and <code>checked</code>
-        attributes on input elements).
-      </p>
-      ${example(TemplateExamples.idl.code, TemplateExamples.idl.example)}
+      <p>Prefix an attribute with <code>.</code> to write an IDL property.</p>
+      ${example(TemplateExamples.idl.code, TemplateExamples.idl.example, 'typescript')}
       <h3>Lists</h3>
-      <p>
-        To render a list, simply iterate over your data and return new
-        <code>ArrowTemplate</code>s. If you want to preserve the DOM nodes and
-        their state you can also provide a unique key to the template by
-        calling the <code>key()</code> method on your template.
-      </p>
-      ${example(TemplateExamples.list.code, TemplateExamples.list.example)}
+      <p>Return an array of templates to render a list. Add <code>.key(...)</code> when identity must survive reorders.</p>
+      ${example(TemplateExamples.list.code, TemplateExamples.list.example, 'typescript')}
       <aside class="tip">
         Keys are only necessary if you want to preserve the DOM nodes and their
         state. Avoid using the index as a key.
       </aside>
       <h3>Events</h3>
-      <p>
-        You can bind an event listener to a DOM element by using the
-        <code>@eventName</code> short hand. This automatically performs a
-        <code>document.addEventListener('eventName')</code> and registers your
-        expression as the event handler.
-      </p>
-      ${example(TemplateExamples.events.code)}
+      <p><code>@eventName</code> attaches an event listener.</p>
+      ${example(TemplateExamples.events.code, null, 'typescript')}
     </section>
   `
 }

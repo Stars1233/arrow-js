@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 
 import { component, html, nextTick, pick, reactive } from '..'
 import type { Props } from '..'
@@ -140,6 +140,36 @@ describe('component', () => {
     data.show = true
     await nextTick()
     expect(root.textContent).toBe('1|2')
+  })
+
+  it('cleans up computed values created inside a component when the slot unmounts', async () => {
+    const data = reactive({ count: 1, show: true })
+    const runs = vi.fn((count: number) => count * 2)
+    const Child = component((props: Props<{ count: number }>) => {
+      const local = reactive({
+        total: reactive(() => runs(props.count)),
+      })
+
+      return html`<div>${() => local.total}</div>`
+    })
+    const root = document.createElement('div')
+
+    html`<main>${() => (data.show ? Child(pick(data, 'count')) : '')}</main>`(root)
+    expect(root.textContent).toBe('2')
+    expect(runs).toHaveBeenCalledTimes(1)
+
+    data.count = 2
+    await nextTick()
+    expect(root.textContent).toBe('4')
+    expect(runs).toHaveBeenCalledTimes(2)
+
+    data.show = false
+    await nextTick()
+    expect(root.textContent).toBe('')
+
+    data.count = 3
+    await nextTick()
+    expect(runs).toHaveBeenCalledTimes(2)
   })
 
   it('preserves keyed component state across list reorders', async () => {

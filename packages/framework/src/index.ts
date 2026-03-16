@@ -1,4 +1,5 @@
-export { asyncComponent } from './async'
+import './install'
+
 export { boundary } from './boundary'
 export type { BoundaryOptions } from './boundary'
 export { render, toTemplate } from './render'

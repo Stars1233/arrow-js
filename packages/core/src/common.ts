@@ -9,6 +9,7 @@ const queueStack: Set<CallableFunction> = new Set()
  * A stack of functions to run on the next tick.
  */
 let nextTicks: CallableFunction[] = []
+let cleanupCollector: Array<() => void> | null = null
 
 /**
  * Adds the ability to listen to the next tick.
@@ -73,4 +74,14 @@ export function queue<T extends unknown>(
     }
     queueStack.add(fn)
   }
+}
+
+export function swapCleanupCollector(collector: Array<() => void> | null) {
+  const previous = cleanupCollector
+  cleanupCollector = collector
+  return previous
+}
+
+export function registerCleanup(fn: () => void) {
+  cleanupCollector?.push(fn)
 }

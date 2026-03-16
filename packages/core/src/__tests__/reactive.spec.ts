@@ -15,6 +15,49 @@ describe('reactive', () => {
     expect(data.x).toBe('foo')
   })
 
+  it('supports computed values inside reactive objects', async () => {
+    const source = reactive({
+      count: 2,
+      multiplier: 3,
+    })
+    const data = reactive({
+      count: reactive(() => source.count * source.multiplier),
+    })
+    const callback = vi.fn(() => data.count)
+
+    watch(callback)
+    expect(callback).toHaveReturnedWith(6)
+
+    source.count = 4
+    await nextTick()
+    expect(callback).toHaveBeenLastCalledWith()
+    expect(callback).toHaveReturnedWith(12)
+
+    source.multiplier = 5
+    await nextTick()
+    expect(callback).toHaveReturnedWith(20)
+  })
+
+  it('supports standalone computed values', async () => {
+    const source = reactive({
+      count: 2,
+      multiplier: 3,
+    })
+    const total = reactive(() => source.count * source.multiplier)
+    const callback = vi.fn(() => total.value)
+
+    watch(callback)
+    expect(callback).toHaveReturnedWith(6)
+
+    source.count = 4
+    await nextTick()
+    expect(callback).toHaveReturnedWith(12)
+
+    source.multiplier = 5
+    await nextTick()
+    expect(callback).toHaveReturnedWith(20)
+  })
+
   it('can record dependencies', async () => {
     const data = reactive<{
       a: string

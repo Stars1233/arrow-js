@@ -4,13 +4,11 @@ import createDocsStore from '../store'
 import footer from '../components/Footer'
 import navigation from '../components/Navigation'
 import gettingStarted from '../components/GettingStarted'
-import changelog from '../components/Changelog'
 import homeHero from '../components/home/hero'
 import whyArrow from '../components/home/why'
 import events from '../js/events'
 import highlight from '../js/highlight'
 import layout from './layout'
-import createAsyncNote from './components/AsyncNote'
 import HydrationProbe from './components/HydrationProbe'
 
 function normalizePath(url) {
@@ -23,8 +21,6 @@ function normalizePath(url) {
 }
 
 function createHomePage() {
-  const asyncNote = createAsyncNote()
-
   return {
     title: 'ArrowJS - Reactive interfaces with no build tools & native JavaScript.',
     description:
@@ -33,7 +29,6 @@ function createHomePage() {
       html`
         <div class="container">
           ${homeHero()}
-          ${boundary(asyncNote, { idPrefix: 'home-async' })}
           ${whyArrow()}
           ${boundary(HydrationProbe(), { idPrefix: 'home-probe' })}
         </div>
@@ -52,7 +47,7 @@ function createDocsPage() {
   return {
     title: 'ArrowJS • Docs',
     description:
-      'Docs for ArrowJS, including reactive primitives, templates, and components.',
+      'Docs for ArrowJS, including core APIs, Vite 8 SSR, hydration, and async components.',
     view: layout(
       html`
         <div class="container">
@@ -61,7 +56,6 @@ function createDocsPage() {
             <article>
               ${gettingStarted()}
               ${boundary(HydrationProbe(), { idPrefix: 'docs-probe' })}
-              ${changelog()}
             </article>
           </div>
         </div>

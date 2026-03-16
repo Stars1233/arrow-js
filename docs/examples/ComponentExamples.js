@@ -16,12 +16,13 @@ const Counter = component((props) => {
 
 export const intro = {
   code: `import { component, html, reactive } from '@arrow-js/core'
+import type { Props } from '@arrow-js/core'
 
 const parentState = reactive({
   count: 1
 })
 
-const Counter = component((props) => {
+const Counter = component((props: Props<{ count: number }>) => {
   const local = reactive({
     clicks: 0
   })
@@ -37,13 +38,14 @@ html\`\${Counter(parentState)}\``,
 
 export const narrowed = {
   code: `import { component, html, pick, reactive } from '@arrow-js/core'
+import type { Props } from '@arrow-js/core'
 
 const state = reactive({
   count: 1,
   theme: 'dark'
 })
 
-const Counter = component((props) =>
+const Counter = component((props: Props<{ count: number }>) =>
   html\`<strong>\${() => props.count}</strong>\`
 )
 

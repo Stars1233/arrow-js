@@ -3,6 +3,7 @@ const runtimeError = document.getElementById('runtime-error')
 
 let activeScript = null
 let activeUrls = []
+let activeStyles = []
 let runId = 0
 
 const post = (type, payload = {}) => {
@@ -17,6 +18,8 @@ const reset = () => {
     activeScript.remove()
     activeScript = null
   }
+  activeStyles.forEach((style) => style.remove())
+  activeStyles = []
   for (const url of activeUrls) URL.revokeObjectURL(url)
   activeUrls = []
 }
@@ -91,6 +94,16 @@ const buildEntryUrl = (modules, entry) => {
   return ensureUrl(entry)
 }
 
+const injectStyles = (styles) => {
+  for (const styleEntry of styles || []) {
+    const style = document.createElement('style')
+    style.dataset.playStyle = styleEntry.name || 'style'
+    style.textContent = styleEntry.content || ''
+    document.head.append(style)
+    activeStyles.push(style)
+  }
+}
+
 window.addEventListener('error', (event) => {
   reportError(event.error || event.message)
 })
@@ -107,12 +120,15 @@ window.addEventListener('message', (event) => {
   reset()
 
   try {
+    injectStyles(data.styles)
     const entryUrl = buildEntryUrl(data.modules || {}, data.entry)
     activeScript = document.createElement('script')
     activeScript.type = 'module'
     activeScript.textContent = `import ${JSON.stringify(entryUrl)}`
-    activeScript.onerror = (error) => {
-      if (currentRun === runId) reportError(error)
+    activeScript.onerror = () => {
+      if (currentRun === runId) {
+        reportError(new Error(`Failed to load playground entry "${data.entry}"`))
+      }
     }
     document.body.append(activeScript)
   } catch (error) {

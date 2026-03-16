@@ -9,9 +9,7 @@ test('home page is server rendered without javascript', async ({ browser }) => {
   await page.goto('/')
 
   await expect(page.locator('h1')).toHaveText('Reactivity without the Framework')
-  await expect(page.locator('#async-flush')).toContainText(
-    'Async child components flushed before this page was sent to the browser.'
-  )
+  await expect(page.locator('#hydration-probe')).toContainText('Clicks: 0')
 
   await context.close()
 })
@@ -24,8 +22,9 @@ test('docs page is server rendered without javascript', async ({ browser }) => {
 
   await page.goto('/docs/')
 
-  await expect(page.locator('#getting-started')).toHaveText('Getting Started')
+  await expect(page.locator('#essentials')).toHaveText('Essentials')
   await expect(page.locator('nav.navigation')).toBeVisible()
+  await expect(page.locator('body')).not.toContainText('Changelog')
 
   await context.close()
 })
@@ -56,7 +55,7 @@ test('home page repairs a tampered async subtree without remounting the app root
   await tamperDocument(page, '/', (html) =>
     html.replace(
       '<script type="module" src="/src/entry-client.js"></script>',
-      '<script>document.getElementById("async-flush")?.remove()</script><script type="module" src="/src/entry-client.js"></script>'
+      '<script>document.getElementById("hydration-probe")?.remove()</script><script type="module" src="/src/entry-client.js"></script>'
     )
   )
   await page.goto('/')
@@ -66,9 +65,7 @@ test('home page repairs a tampered async subtree without remounting the app root
   await expect
     .poll(() => page.evaluate(() => window.__arrowAppReplaceChildrenCalls))
     .toBe(0)
-  await expect(page.locator('#async-flush')).toContainText(
-    'Async child components flushed before this page was sent to the browser.'
-  )
+  await expect(probe).toContainText('Clicks: 0')
   await probe.click()
   await expect(probe).toHaveText('Clicks: 1')
 })
@@ -103,6 +100,46 @@ test('shared header shows icon controls and theme toggle works', async ({ page }
   await expect(html).toHaveAttribute('data-theme', 'light')
   await toggle.click()
   await expect(html).toHaveAttribute('data-theme', 'dark')
+})
+
+test('docs TypeScript examples expose Twoslash hover data', async ({ page }) => {
+  const messages = []
+  page.on('console', (msg) => {
+    if (msg.type() === 'error' || msg.type() === 'warning') {
+      messages.push(msg.text())
+    }
+  })
+
+  await page.goto('/docs/')
+
+  await expect
+    .poll(() => page.locator('pre.twoslash').count())
+    .toBeGreaterThan(18)
+
+  const block = page.locator('pre.twoslash').first()
+  await expect(block).toBeVisible()
+
+  const hoverToken = block.locator('.twoslash-hover').first()
+  const box = await hoverToken.boundingBox()
+
+  if (!box) {
+    throw new Error('Unable to measure Twoslash hover token.')
+  }
+
+  await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2)
+
+  await expect(block.locator('.twoslash-popup-container').first()).toBeVisible()
+  expect(messages).toEqual([])
+})
+
+test('docs examples link into the playground and changelog is absent', async ({
+  page,
+}) => {
+  await page.goto('/docs/')
+
+  await expect(page.locator('article')).not.toContainText('Changelog')
+  await expect(page.locator('.docs-example-card')).toHaveCount(6)
+  await expect(page.locator('.docs-example-card a[href^="/play/"]')).toHaveCount(6)
 })
 
 async function trackAppRootReplacements(page) {

@@ -1,4 +1,4 @@
-import { isR, isO, queue } from './common'
+import { isR, isO, queue, registerCleanup } from './common'
 import { expressionPool, onExpressionUpdate } from './expressions'
 import { ArrowFunction, ArrowRenderable } from './html'
 
@@ -27,6 +27,14 @@ interface ReactiveAPI<T> {
 /**
  * A reactive object is a proxy of an original object.
  */
+export interface Computed<T> extends Readonly<Reactive<{ value: T }>> {}
+
+type ReactiveValue<T> = T extends Computed<infer TValue>
+  ? TValue
+  : T extends ReactiveTarget
+    ? Reactive<T> | T
+    : T
+
 export type Reactive<T extends ReactiveTarget> = {
   /**
    * In the future it would be great to have variant types here for
@@ -40,7 +48,7 @@ export type Reactive<T extends ReactiveTarget> = {
    * ```
    * This requires an update to TypeScript: https://github.com/microsoft/TypeScript/issues/43826
    */
-  [P in keyof T]: T[P] extends ReactiveTarget ? Reactive<T[P]> | T[P] : T[P]
+  [P in keyof T]: ReactiveValue<T[P]>
 } & ReactiveAPI<T>
 
 /**
@@ -65,7 +73,8 @@ type ListenerMap = Partial<Record<PropertyKey, Set<PropertyObserver<unknown>>>>
  * A registry of reactive objects to their unique numeric index which serves as
  * an unique identifier.
  */
-const ids = new WeakMap<ReactiveTarget, number>()
+const ids = new WeakMap<object, number>()
+const computedIds: boolean[] = []
 
 /**
  * A registry of reactive objects to their property observers.
@@ -77,7 +86,7 @@ const listeners: ListenerMap[] = []
  * @param target - The object to get the id of.
  * @returns
  */
-const getId = (target: ReactiveTarget): number => ids.get(target)!
+const getId = (target: object): number => ids.get(target)!
 
 /**
  * An index counter for the reactive objects.
@@ -130,7 +139,14 @@ const parents: Array<[parent: number, property: PropertyKey]>[] = []
  * @param data - The data to make reactive, typically a plain object.
  * @returns A reactive proxy of the original data.
  */
-export function reactive<T extends ReactiveTarget>(data: T): Reactive<T> {
+export function reactive<T>(effect: () => T): Computed<T>
+export function reactive<T extends ReactiveTarget>(data: T): Reactive<T>
+export function reactive<T extends ReactiveTarget, TValue>(
+  data: T | (() => TValue)
+): Reactive<T> | Computed<TValue> {
+  if (typeof data === 'function') {
+    return createComputed(data as () => TValue)
+  }
   // The data is already a reactive object, so return it.
   if (isR(data)) return data as Reactive<T>
   // Only valid objects can be reactive.
@@ -189,6 +205,7 @@ function get(
     // Explicitly don’t track the length property.
     return trackArray(id, key, target, value)
   }
+  if (isComputed(value)) return readComputed(value, id, key)
   track(id, key)
   return value
 }
@@ -217,6 +234,7 @@ function trackArray(
       return result
     }
   }
+  if (isComputed(value)) return readComputed(value, id, key)
   return value
 }
 
@@ -243,6 +261,9 @@ function set(
   const oldValue = target[key as number]
   // The new value
   const newValue = newReactive ?? value
+  if (isR(newValue) && computedIds[getId(newValue as object)]) {
+    linkParent(getId(newValue as object), id, key)
+  }
   // Perform the actual set operation
   const didSucceed = Reflect.set(target, key, newValue, receiver)
   // If the old value was reactive, and the new value is
@@ -250,7 +271,13 @@ function set(
     reassign(id, key, getId(oldValue), getId(newValue))
   }
   // Notify all listeners
-  emit(id, key, value, oldValue, isNewProperty)
+  emit(
+    id,
+    key,
+    value,
+    oldValue,
+    isNewProperty || (key === 'value' && computedIds[id])
+  )
   // If the array length is modified, notify all parents
   if (Array.isArray(target) && key === 'length') {
     parents[id]?.forEach(([parentId, property]) => emit(parentId, property))
@@ -271,9 +298,45 @@ function createChild(
   key: PropertyKey
 ): Reactive<ReactiveTarget> {
   const r = reactive(child)
-  parents[getId(child)] ??= []
-  parents[getId(child)].push([parentId, key])
+  linkParent(getId(child), parentId, key)
   return r
+}
+
+function createComputed<T>(effect: () => T): Computed<T> {
+  const source = {
+    value: undefined as T,
+  }
+  const state = reactive(source) as Reactive<{ value: T }>
+  computedIds[getId(state as object)] = true
+  const [, stop] = watch(
+    effect,
+    (value) => (state.value = value as Reactive<{ value: T }>['value'])
+  )
+  registerCleanup(stop)
+  return state as Computed<T>
+}
+
+function isComputed(value: unknown): value is Reactive<{ value: unknown }> {
+  return isR(value) && computedIds[getId(value as object)]
+}
+
+function readComputed(
+  value: Reactive<{ value: unknown }>,
+  parentId: number,
+  key: PropertyKey
+) {
+  const computedId = getId(value as object)
+  track(parentId, key)
+  linkParent(computedId, parentId, key)
+  track(computedId, 'value')
+  return value.value
+}
+
+function linkParent(childId: number, parentId: number, key: PropertyKey) {
+  if (!parents[childId]?.some(([parent, property]) => parent === parentId && property === key)) {
+    parents[childId] ??= []
+    parents[childId].push([parentId, key])
+  }
 }
 
 /**
@@ -296,11 +359,7 @@ function reassign(
     )
     if (index > -1) parents[from].splice(index, 1)
   }
-  // Create a new parent relationship if it does not already exist.
-  if (!parents[to]?.some(([i, property]) => i == parentId && key == property)) {
-    parents[to] ??= []
-    parents[to].push([parentId, key])
-  }
+  linkParent(to, parentId, key)
 }
 
 /**

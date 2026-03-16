@@ -1,3 +1,5 @@
+import '../../framework/src/install'
+
 import type { ArrowTemplate, ParentNode } from '../../core/src/html'
 import type { RenderPayload } from '../../framework/src/render'
 import { withRenderContext } from '../../framework/src/context'

@@ -1,18 +1,14 @@
 import { component, html, reactive } from '@arrow-js/core'
-import type { Props, ReactiveTarget } from '@arrow-js/core'
-import type { Component, ComponentWithProps } from '../../core/src/component'
+import type {
+  AsyncComponentOptions,
+  Component,
+  ComponentWithProps,
+  Props,
+  ReactiveTarget,
+} from '@arrow-js/core'
 import { getRenderContext, runWithRenderContext } from './context'
 
 type AsyncStatus = 'idle' | 'pending' | 'resolved' | 'rejected'
-
-export interface AsyncComponentOptions<TProps extends ReactiveTarget, TValue, TSnapshot> {
-  fallback?: unknown
-  onError?: (error: unknown, props: Props<TProps>) => unknown
-  render?: (value: TValue, props: Props<TProps>) => unknown
-  serialize?: (value: TValue, props: Props<TProps>) => TSnapshot
-  deserialize?: (snapshot: TSnapshot, props: Props<TProps>) => TValue
-  idPrefix?: string
-}
 
 export function asyncComponent<TValue, TSnapshot = unknown>(
   loader: () => Promise<TValue> | TValue,
@@ -45,10 +41,12 @@ export function asyncComponent<TProps extends ReactiveTarget, TValue, TSnapshot 
         `${options.idPrefix ?? 'c'}:client:${clientComponentIndex++}`
     }
 
-    if (state.status === 'idle' && context && options.deserialize) {
+    if (state.status === 'idle' && context) {
       const snapshot = context.consumeSnapshot(state.id)
       if (snapshot !== undefined) {
-        state.value = options.deserialize(snapshot as TSnapshot, props)
+        state.value = options.deserialize
+          ? options.deserialize(snapshot as TSnapshot, props)
+          : snapshot
         state.status = 'resolved'
       }
     }
@@ -67,8 +65,11 @@ export function asyncComponent<TProps extends ReactiveTarget, TValue, TSnapshot 
           runInContext(() => {
             state.value = value
             state.status = 'resolved'
-            if (context && options.serialize) {
-              context.recordSnapshot(state.id, options.serialize(value, props))
+            const snapshot =
+              options.serialize?.(value, props) ?? createDefaultSnapshot(value)
+
+            if (context && snapshot !== undefined) {
+              context.recordSnapshot(state.id, snapshot)
             }
           })
         })
@@ -110,4 +111,12 @@ export function asyncComponent<TProps extends ReactiveTarget, TValue, TSnapshot 
       return options.fallback ?? ''
     }}`
   }) as Component | ComponentWithProps<TProps>
+}
+
+function createDefaultSnapshot<TValue>(value: TValue) {
+  try {
+    return JSON.stringify(value) === undefined ? undefined : value
+  } catch {
+    return undefined
+  }
 }

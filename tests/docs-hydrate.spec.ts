@@ -29,14 +29,14 @@ describe('docs hydration', () => {
     expect(root.firstElementChild).toBe(existing)
   })
 
-  it('repairs a missing async note on the home page without replacing intact siblings', async () => {
+  it('repairs a missing hydration probe on the home page without replacing intact siblings', async () => {
     const root = document.createElement('div')
     const serverPage = createPage('/')
     const ssr = await renderToString(serverPage.view)
     root.innerHTML = ssr.html
 
     const existingHero = root.querySelector('.the-home-hero')
-    root.querySelector('#async-flush')?.remove()
+    root.querySelector('#hydration-probe')?.remove()
 
     const clientPage = createPage('/')
     const result = await hydrate(root, clientPage.view, ssr.payload)
@@ -44,9 +44,7 @@ describe('docs hydration', () => {
     expect(result.adopted).toBe(true)
     expect(result.mismatches).toBeGreaterThan(0)
     expect(root.querySelector('.the-home-hero')).toBe(existingHero)
-    expect(root.querySelector('#async-flush')?.textContent).toContain(
-      'Async child components flushed before this page was sent to the browser.'
-    )
+    expect(root.querySelector('#hydration-probe')?.textContent).toContain('Clicks: 0')
 
     ;(root.querySelector('#hydration-probe') as HTMLButtonElement).click()
     await nextTick()

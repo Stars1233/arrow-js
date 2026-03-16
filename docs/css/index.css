@@ -609,6 +609,11 @@ aside[data-is-open]::after {
   overflow: hidden;
   margin-bottom: 1em;
 }
+.stage[data-has-twoslash='true'] {
+  overflow: visible;
+  position: relative;
+  z-index: 1;
+}
 .stage .example {
   font-size: 0.875em;
   padding: 1em;
@@ -620,6 +625,12 @@ aside[data-is-open]::after {
   background: var(--shiki-color-background);
   overflow: auto;
 }
+.stage[data-has-twoslash='true'] > pre {
+  overflow-x: auto;
+  overflow-y: visible;
+  position: relative;
+  z-index: 2;
+}
 .stage pre pre {
   background-color: transparent !important;
   margin: 0;
@@ -628,6 +639,22 @@ aside[data-is-open]::after {
   font-size: 0.9rem;
   background: none;
   margin: 0;
+}
+.stage pre.twoslash {
+  padding-top: 0.75rem;
+  padding-bottom: 0.75rem;
+}
+.stage pre.twoslash code {
+  display: block;
+}
+.stage pre.twoslash .twoslash-hover {
+  position: relative;
+}
+.stage pre.twoslash .twoslash-popup-container {
+  z-index: 80;
+}
+.stage pre.twoslash .twoslash-popup-code {
+  box-shadow: 0 12px 30px rgba(15, 23, 42, 0.16);
 }
 .example ul {
   margin: 0;

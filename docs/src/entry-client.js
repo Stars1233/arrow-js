@@ -13,7 +13,12 @@ if (!root) {
 
 await hydrate(root, page.view, payload, {
   onMismatch(details) {
-    console.warn('Arrow hydration mismatch detected, falling back to client render.', details)
+    if (!details.repaired || details.boundaryFallbacks > 0) {
+      console.warn(
+        'Arrow hydration mismatch detected, falling back to client render.',
+        details
+      )
+    }
   },
 })
 

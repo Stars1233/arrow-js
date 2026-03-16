@@ -35,6 +35,36 @@ data.price = 35
 `,
     example: '<code class="console">// outputs \'Price changed to 35\' </code>',
   },
+  computed: {
+    code: `import { reactive } from '@arrow-js/core'
+
+const props = reactive({
+  count: 2,
+  multiplier: 10
+})
+
+const data = reactive({
+  total: reactive(() => props.count * props.multiplier)
+})
+
+console.log(data.total) // 20
+props.count = 3
+console.log(data.total) // 30
+`,
+    example: () => {
+      const props = reactive({
+        count: 2,
+        multiplier: 10,
+      })
+      const data = reactive({
+        total: reactive(() => props.count * props.multiplier),
+      })
+
+      return html`<button @click="${() => props.count++}">
+        Total ${() => data.total}
+      </button>`
+    },
+  },
   calculator: {
     code: `import { reactive } from '@arrow-js/core'
 
@@ -93,8 +123,8 @@ const data = reactive({
 })
 
 watch(
-  () => data.logTotal && data.price * data.quantity,
-  (total) => total !== false && console.log(\`Total: \${total}\`)
+  () => data.logTotal ? data.price * data.quantity : null,
+  (total) => total !== null && console.log(\`Total: \${total}\`)
 )
 
 data.price = 35`,

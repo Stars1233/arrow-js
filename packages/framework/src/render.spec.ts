@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
 import { component, html, nextTick, reactive } from '@arrow-js/core'
-import { asyncComponent, boundary, render } from '@arrow-js/framework'
+import { boundary, render } from '@arrow-js/framework'
 import { hydrate } from '@arrow-js/hydrate'
 import { renderToString } from '@arrow-js/ssr'
 
@@ -13,7 +13,7 @@ function delay(ms = 0) {
 describe('framework render', () => {
   it('waits for async child components to flush', async () => {
     const root = document.createElement('div')
-    const child = asyncComponent(async () => {
+    const child = component(async () => {
       await delay()
       return html`<span>ready</span>`
     })
@@ -25,11 +25,11 @@ describe('framework render', () => {
 
   it('waits for nested async child components to flush', async () => {
     const root = document.createElement('div')
-    const grandChild = asyncComponent(async () => {
+    const grandChild = component(async () => {
       await delay()
       return html`<em>nested ready</em>`
     })
-    const child = asyncComponent(async () => {
+    const child = component(async () => {
       await delay()
       return html`<div>${grandChild()}</div>`
     })
@@ -42,7 +42,7 @@ describe('framework render', () => {
 
 describe('framework ssr', () => {
   it('serializes resolved async content', async () => {
-    const child = asyncComponent(async () => {
+    const child = component(async () => {
       await delay()
       return html`<span>server ready</span>`
     })
@@ -64,7 +64,7 @@ describe('framework ssr', () => {
   })
 
   it('keeps nested async SSR isolated across concurrent renders', async () => {
-    const GrandChild = asyncComponent<{ label: string }, string>(
+    const GrandChild = component<{ label: string }, string>(
       async ({ label }: { label: string }) => {
         await delay()
         return label
@@ -73,7 +73,7 @@ describe('framework ssr', () => {
         render: (value) => html`<strong>${value}</strong>`,
       }
     )
-    const Child = asyncComponent<{ label: string }, string>(
+    const Child = component<{ label: string }, string>(
       async ({ label }: { label: string }) => {
         await delay()
         return label
@@ -186,7 +186,7 @@ describe('framework hydrate', () => {
     const state = reactive({
       clicks: 0,
     })
-    const AsyncCounter = asyncComponent(async () => {
+    const AsyncCounter = component(async () => {
       await delay()
       return html`<button
         id="async-probe"
@@ -216,12 +216,33 @@ describe('framework hydrate', () => {
     )
   })
 
+  it('keeps async component template computations live when they depend on reactive props', async () => {
+    const root = document.createElement('div')
+    const state = reactive({
+      count: 2,
+      multiplier: 3,
+    })
+    const AsyncCounter = component(async (props: { count: number; multiplier: number }) => {
+      const resolvedMultiplier = await Promise.resolve(props.multiplier)
+      return html`<strong id="async-derived">${() => props.count * resolvedMultiplier}</strong>`
+    })
+
+    const createView = () => html`${AsyncCounter(state)}`
+
+    await render(root, createView())
+    expect(root.querySelector('#async-derived')?.textContent).toBe('6')
+
+    state.count = 4
+    await nextTick()
+    expect(root.querySelector('#async-derived')?.textContent).toBe('12')
+  })
+
   it('hydrates deeply nested serialized async request results without refetching', async () => {
     const root = document.createElement('div')
     const createView = (
       request: (resource: string) => Promise<{ resource: string; message: string }>
     ) => {
-      const AsyncLeaf = asyncComponent<
+      const AsyncLeaf = component<
         { resource: string },
         { resource: string; message: string },
         { resource: string; message: string }
@@ -261,7 +282,7 @@ describe('framework hydrate', () => {
 
     expect(serverRequest).toHaveBeenCalledTimes(1)
     expect(ssr.html).toContain('Loaded guide')
-    expect(Object.values(ssr.payload.async)).toContainEqual({
+    expect(Object.values(ssr.payload.async ?? {})).toContainEqual({
       resource: 'guide',
       message: 'Loaded guide',
     })

@@ -12,6 +12,10 @@ let vite = null
 const templatePath = path.resolve(__dirname, 'index.html')
 const clientDistPath = path.resolve(__dirname, 'dist/client')
 const serverEntryPath = path.resolve(__dirname, 'dist/server/entry-server.js')
+const playgroundRuntimePath = path.resolve(
+  __dirname,
+  '../packages/core/dist/index.mjs'
+)
 
 const server = http.createServer(async (request, response) => {
   const url = request.url ?? '/'
@@ -28,13 +32,13 @@ const server = http.createServer(async (request, response) => {
       if (response.writableEnded || response.headersSent) {
         return
       }
-    } else {
-      const staticFile = await resolveStaticFile(url)
+    }
 
-      if (staticFile) {
-        await serveStaticAsset(staticFile, response)
-        return
-      }
+    const staticFile = await resolveStaticFile(url)
+
+    if (staticFile) {
+      await serveStaticAsset(staticFile, response)
+      return
     }
 
     if (!isDocumentRequest(request)) {
@@ -100,6 +104,10 @@ server.listen(port, '127.0.0.1', () => {
 async function resolveStaticFile(url) {
   const pathname = new URL(url, 'http://arrow.local').pathname
 
+  if (pathname === '/play/arrow-runtime.js') {
+    return playgroundRuntimePath
+  }
+
   if (pathname === '/' || pathname === '/docs' || pathname === '/docs/') {
     return null
   }
@@ -131,6 +139,7 @@ async function serveStaticAsset(filePath, response) {
 function contentTypeFor(filePath) {
   if (filePath.endsWith('.css')) return 'text/css'
   if (filePath.endsWith('.js')) return 'application/javascript'
+  if (filePath.endsWith('.mjs')) return 'application/javascript'
   if (filePath.endsWith('.html')) return 'text/html'
   if (filePath.endsWith('.svg')) return 'image/svg+xml'
   if (filePath.endsWith('.png')) return 'image/png'

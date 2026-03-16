@@ -1,5 +1,5 @@
 import { watch } from './reactive'
-import { isChunk, isTpl, queue } from './common'
+import { isChunk, isTpl, queue, swapCleanupCollector } from './common'
 import { setAttr } from './dom'
 import {
   createPropsProxy,
@@ -750,9 +750,22 @@ function createRenderFn(): RenderController {
 
   function renderComponent(renderable: ComponentCall): [DocumentFragment, Chunk] {
     const [props, box] = createPropsProxy(renderable.p, renderable.h)
-    const template = renderable.h(props)
-    const fragment = template()
+    const cleanups: Array<() => void> = []
+    const previousCollector = swapCleanupCollector(cleanups)
+    let template: InternalTemplate
+    let fragment: DocumentFragment
+
+    try {
+      template = renderable.h(props) as InternalTemplate
+      fragment = template() as DocumentFragment
+    } finally {
+      swapCleanupCollector(previousCollector)
+    }
+
     const chunk = template._c()
+    if (cleanups.length) {
+      ;(chunk.u ??= []).push(...cleanups)
+    }
     chunk.s = box
     chunk.k = renderable.k
     return [fragment, chunk]

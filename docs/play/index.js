@@ -1,54 +1,20 @@
 import { html, reactive } from '@src/index'
 import logoUrl from '../img/logo.png'
 import arrowTypes from './arrow-types.d.ts?raw'
+import {
+  ENTRY_FILE,
+  cloneExampleFiles,
+  getPlaygroundExample,
+} from './example-registry'
+import { playgroundExampleHref, starterExampleId } from './example-meta'
 
 const MONACO_BASE = 'https://cdn.jsdelivr.net/npm/monaco-editor@0.52.2/min'
 const MONACO_URL = `${MONACO_BASE}/vs`
-const ENTRY_FILE = 'main.ts'
 const DESKTOP_SPLIT_BREAKPOINT = 1080
 const MIN_SPLIT_PANE = 320
 const SPLITTER_SIZE = 7
-const DEFAULT_FILES = [
-  [
-    'main.ts',
-    `import { html, reactive } from '@arrow-js/core'
-import { Counter } from './Component'
-
-const state = reactive({
-  count: 1,
-  items: [
-    { id: 1, label: 'Arrow is tiny' },
-    { id: 2, label: 'Arrow is native-first' },
-  ],
-})
-
-html\`
-  <main style="padding: 24px; font: 16px/1.5 system-ui, sans-serif">
-    <h1>Arrow Playground</h1>
-    <p>Count: \${() => state.count}</p>
-    <button @click="\${() => state.count++}">Increment</button>
-    \${Counter()}
-    <ul>
-      \${() => state.items.map((item) => html\`<li>\${item.label}</li>\`.key(item.id))}
-    </ul>
-  </main>
-\`(document.getElementById('app')!)`,
-  ],
-  [
-    'Component.ts',
-    `import { component, html, reactive } from '@arrow-js/core'
-
-export const Counter = component(() => {
-  const local = reactive({
-    clicks: 0,
-  })
-
-  return html\`<button @click="\${() => local.clicks++}">
-    Local clicks: \${() => local.clicks}
-  </button>\`
-})`,
-  ],
-]
+const PLAYGROUND_DEFAULT_EXAMPLE = starterExampleId
+const FILE_NAME_PATTERN = /^[A-Za-z][A-Za-z0-9_-]*\.(ts|css)$/
 
 const state = reactive({
   activeFile: ENTRY_FILE,
@@ -58,12 +24,22 @@ const state = reactive({
       : true,
   copied: false,
   editorWidth: 0,
+  exampleId:
+    typeof window !== 'undefined'
+      ? getExampleIdFromLocation()
+      : PLAYGROUND_DEFAULT_EXAMPLE,
   menuFile: '',
   menuX: 0,
   menuY: 0,
   renaming: '',
   resizing: false,
-  files: DEFAULT_FILES.map(([name]) => ({
+  files: cloneExampleFiles(
+    getPlaygroundExample(
+      typeof window !== 'undefined'
+        ? getExampleIdFromLocation()
+        : PLAYGROUND_DEFAULT_EXAMPLE
+    ).files
+  ).map(([name]) => ({
     errors: 0,
     name,
   })),
@@ -106,7 +82,16 @@ const decodeText = (value) => {
   return new TextDecoder().decode(bytes)
 }
 
-const isTsFileName = (value) => /^[A-Za-z][A-Za-z0-9_-]*\.ts$/.test(value)
+function getExampleIdFromLocation() {
+  const params = new URLSearchParams(window.location.search)
+  const exampleId = params.get('example')
+
+  return getPlaygroundExample(exampleId).id
+}
+
+const isSupportedFileName = (value) => FILE_NAME_PATTERN.test(value)
+const isTsFileName = (value) => value.endsWith('.ts')
+const isCssFileName = (value) => value.endsWith('.css')
 
 const createSnapshot = () => ({
   active: state.activeFile,
@@ -131,7 +116,7 @@ const parseSnapshot = (hash) => {
           Array.isArray(entry) &&
           typeof entry[0] === 'string' &&
           typeof entry[1] === 'string' &&
-          isTsFileName(entry[0])
+          isSupportedFileName(entry[0])
       )
       .map(([name, code]) => [name, code])
 
@@ -159,7 +144,26 @@ const parseSnapshot = (hash) => {
   }
 }
 
+const createExampleSnapshot = (exampleId) => {
+  const example = getPlaygroundExample(exampleId)
+
+  return {
+    active: example.entry,
+    files: cloneExampleFiles(example.files),
+  }
+}
+
+const snapshotsEqual = (left, right) =>
+  left.active === right.active &&
+  left.files.length === right.files.length &&
+  left.files.every(
+    ([name, code], index) =>
+      right.files[index]?.[0] === name && right.files[index]?.[1] === code
+  )
+
 const readInitialSnapshot = () => {
+  state.exampleId = getExampleIdFromLocation()
+
   const parsed = parseSnapshot(window.location.hash.slice(1))
   if (parsed) {
     lastHash = window.location.hash.slice(1)
@@ -167,8 +171,7 @@ const readInitialSnapshot = () => {
   }
 
   return {
-    active: ENTRY_FILE,
-    files: DEFAULT_FILES,
+    ...createExampleSnapshot(state.exampleId),
   }
 }
 
@@ -176,9 +179,19 @@ const modelUri = (name) => monaco.Uri.parse(`file:///playground/${name}`)
 
 const getFileState = (name) => state.files.find((file) => file.name === name)
 const isLockedFile = (name) => name === ENTRY_FILE
+const fileLanguage = (name) => (isCssFileName(name) ? 'css' : 'typescript')
+const fileIconLabel = (name) => (isCssFileName(name) ? 'CSS' : 'TS')
 
 const closeFileMenu = () => {
   state.menuFile = ''
+}
+
+const buildPlaygroundUrl = (hash = lastHash, exampleId = state.exampleId) => {
+  const base = exampleId && exampleId !== starterExampleId
+    ? playgroundExampleHref(exampleId)
+    : window.location.pathname
+
+  return hash ? `${base}#${hash}` : base
 }
 
 const getSplitBounds = () => {
@@ -259,9 +272,11 @@ const startResize = (event) => {
 }
 
 const writeHash = () => {
-  const encoded = encodeSnapshot()
+  const snapshot = createSnapshot()
+  const baseSnapshot = createExampleSnapshot(state.exampleId)
+  const encoded = snapshotsEqual(snapshot, baseSnapshot) ? '' : encodeText(JSON.stringify(snapshot))
   if (encoded !== lastHash) {
-    history.replaceState(null, '', encoded ? `#${encoded}` : location.pathname)
+    history.replaceState(null, '', buildPlaygroundUrl(encoded))
     lastHash = encoded
   }
 }
@@ -306,10 +321,22 @@ const createMarker = (model, diagnostic) => {
 const buildModulePayload = async () => {
   const workerFactory = await monaco.languages.typescript.getTypeScriptWorker()
   const modules = {}
+  const styles = []
 
   for (const file of state.files) {
     const model = models.get(file.name)
     if (!model) continue
+
+    if (isCssFileName(file.name)) {
+      monaco.editor.setModelMarkers(model, 'arrow-play', [])
+      file.errors = 0
+      styles.push({
+        name: file.name,
+        content: model.getValue(),
+      })
+      continue
+    }
+
     const worker = await workerFactory(model.uri)
     const [syntactic, semantic, emit] = await Promise.all([
       worker.getSyntacticDiagnostics(model.uri.toString()),
@@ -327,7 +354,7 @@ const buildModulePayload = async () => {
     if (output) modules[file.name] = output.text
   }
 
-  return modules
+  return { modules, styles }
 }
 
 const runPreview = (payload) => {
@@ -342,10 +369,10 @@ const runPreview = (payload) => {
 const compileAndRun = async () => {
   if (!editor || !monaco) return
   const currentCompile = ++compileId
-  const modules = await buildModulePayload()
+  const payload = await buildModulePayload()
   if (currentCompile !== compileId) return
-  if (!modules[ENTRY_FILE]) return
-  runPreview({ entry: ENTRY_FILE, modules })
+  if (!payload.modules[ENTRY_FILE]) return
+  runPreview({ entry: ENTRY_FILE, ...payload })
 }
 
 const scheduleCompile = () => {
@@ -626,6 +653,10 @@ const applyHtmlHighlight = () => {
   if (!editor || !monaco || !htmlDecorations) return
   const model = editor.getModel()
   if (!model) return
+  if (isCssFileName(state.activeFile)) {
+    htmlDecorations.clear()
+    return
+  }
   htmlDecorations.set(buildHtmlDecorations(model))
 }
 
@@ -661,7 +692,7 @@ const restoreSnapshot = (snapshot) => {
   const nextFiles = snapshot.files.map(([name, code]) => {
     let model = models.get(name)
     if (!model) {
-      model = monaco.editor.createModel(code, 'typescript', modelUri(name))
+      model = monaco.editor.createModel(code, fileLanguage(name), modelUri(name))
       models.set(name, model)
     } else if (model.getValue() !== code) {
       model.setValue(code)
@@ -695,6 +726,10 @@ const copyUrl = async () => {
 }
 
 const createFileTemplate = (name) => {
+  if (isCssFileName(name)) {
+    return `#app {\n  padding: 24px;\n}\n`
+  }
+
   const base = name.replace(/\.ts$/, '')
   const exportName =
     base
@@ -725,19 +760,19 @@ const createDuplicateName = (name) => {
 
 const commitRename = (file, newName) => {
   newName = newName.trim()
-  if (!newName.endsWith('.ts')) newName += '.ts'
+  if (!/\.[A-Za-z]+$/.test(newName)) newName += '.ts'
   state.renaming = ''
 
   const isNew = !models.has(file.name)
 
-  if (!isTsFileName(newName)) return isNew ? removeFile(file.name) : undefined
+  if (!isSupportedFileName(newName)) return isNew ? removeFile(file.name) : undefined
   if (newName !== file.name && models.has(newName))
     return isNew ? removeFile(file.name) : undefined
 
   if (isNew) {
     const model = monaco.editor.createModel(
       createFileTemplate(newName),
-      'typescript',
+      fileLanguage(newName),
       modelUri(newName)
     )
     models.set(newName, model)
@@ -760,7 +795,7 @@ const commitRename = (file, newName) => {
 
   const newModel = monaco.editor.createModel(
     code,
-    'typescript',
+    fileLanguage(newName),
     modelUri(newName)
   )
   models.set(newName, newModel)
@@ -823,7 +858,7 @@ const duplicateFile = (name) => {
   const copyName = createDuplicateName(name)
   const copyModel = monaco.editor.createModel(
     source.getValue(),
-    'typescript',
+    fileLanguage(copyName),
     modelUri(copyName)
   )
   const index = state.files.findIndex((file) => file.name === name)
@@ -865,16 +900,18 @@ const onFrameMessage = (event) => {
   }
 }
 
-const applyHashChange = () => {
+const syncFromLocation = () => {
   if (!monaco) return
-  const incoming = window.location.hash.slice(1)
-  if (incoming === lastHash) return
-  const snapshot = parseSnapshot(incoming)
-  if (!snapshot) return
+
+  const nextExampleId = getExampleIdFromLocation()
+  const incomingHash = window.location.hash.slice(1)
+  const snapshot = parseSnapshot(incomingHash) ?? createExampleSnapshot(nextExampleId)
+
+  state.exampleId = nextExampleId
   applyingHash = true
   restoreSnapshot(snapshot)
   applyingHash = false
-  lastHash = incoming
+  lastHash = parseSnapshot(incomingHash) ? incomingHash : ''
   scheduleCompile()
 }
 
@@ -974,7 +1011,7 @@ const shell = html`
     <main class="play-workspace">
       <aside class="play-explorer">
         <div class="play-explorer-header">
-          <span class="play-explorer-title">Explorer</span>
+          <span class="play-explorer-title">Files</span>
           <button
             class="play-icon-button"
             @click="${addFile}"
@@ -1000,7 +1037,7 @@ const shell = html`
                 }}"
               >
                 <span class="play-file-main">
-                  <span class="play-file-icon">TS</span>
+                  <span class="play-file-icon">${fileIconLabel(file.name)}</span>
                   ${() =>
                     state.renaming === file.name
                       ? html`<input
@@ -1031,7 +1068,7 @@ const shell = html`
         <section class="play-editor-pane">
           <div class="play-pane-header">
             <span class="play-pane-tab">
-              <span class="play-file-icon">TS</span>
+              <span class="play-file-icon">${() => fileIconLabel(state.activeFile)}</span>
               ${() => state.activeFile}
             </span>
           </div>
@@ -1107,7 +1144,8 @@ shell(document.getElementById('app'))
 previewFrame = document.getElementById('play-preview')
 
 window.addEventListener('message', onFrameMessage)
-window.addEventListener('hashchange', applyHashChange)
+window.addEventListener('hashchange', syncFromLocation)
+window.addEventListener('popstate', syncFromLocation)
 window.addEventListener('mousedown', (event) => {
   if (!state.menuFile) return
   if (event.target instanceof Element && event.target.closest('.play-context-menu'))

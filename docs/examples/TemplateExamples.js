@@ -14,7 +14,11 @@ const data = reactive({
 export const intro = {
   code: `import { html } from '@arrow-js/core'
 
-const appElement = document.getElementById('app');
+const appElement = document.getElementById('app')
+
+if (!appElement) {
+  throw new Error('Missing #app')
+}
 
 const template = html\`Hello <em>World</em>\`
 
@@ -23,11 +27,16 @@ template(appElement)`,
 }
 
 export const expressions = {
-  code: `import { html } from '@arrow-js/core'
+  code: `import { html, reactive } from '@arrow-js/core'
+
+const data = reactive({
+  location: 'World'
+})
+
 html\`
   <ul>
-    <li>Hello \${data.location} (🪨 static expression)</li>
-    <li>Hello \${() => data.location} (⚡ dynamic expression)</li>
+    <li>Hello \${data.location} (static expression)</li>
+    <li>Hello \${() => data.location} (reactive expression)</li>
   </ul>
 \``,
   example: html`
@@ -49,7 +58,13 @@ html\`
   `,
 }
 
-export const invalid = `html\`<p>
+export const invalid = `import { html, reactive } from '@arrow-js/core'
+
+const data = reactive({
+  ordered: false
+})
+
+html\`<p>
   A list of items:
   <\${() => data.ordered ? 'ol' : 'ul'} class="list">
     <li>First item</li>
@@ -65,7 +80,9 @@ const updateProgress = () =>
   )
 
 export const attributes = {
-  code: `const upload = reactive({
+  code: `import { html, reactive } from '@arrow-js/core'
+
+const upload = reactive({
   progress: 0
 })
 
@@ -86,14 +103,22 @@ html\`<progress value="\${() => upload.progress}" max="100"></progress>\``,
 }
 
 export const events = {
-  code: `const data = reactive({
+  code: `import { html, reactive } from '@arrow-js/core'
+
+const data = reactive({
   value: ''
 })
 
 html\`
-<input type="text" @input="\${e => { data.value = e.target.value }}">
-<br>
-<em>\${() => data.value}</em>
+  <input
+    type="text"
+    @input="\${(event: Event) => {
+      const input = event.target as HTMLInputElement | null
+      data.value = input?.value ?? ''
+    }}"
+  />
+  <br />
+  <em>\${() => data.value}</em>
 \``,
   example: html`
     <input
@@ -107,7 +132,9 @@ html\`
   `,
 }
 export const idl = {
-  code: `const data = reactive({
+  code: `import { html, reactive } from '@arrow-js/core'
+
+const data = reactive({
   colors: ['red', 'green', 'blue']
 })
 
@@ -117,9 +144,14 @@ html\`
 }
 
 export const list = {
-  code: `import { html, reactive } from '@arrow/core'
+  code: `import { html, reactive } from '@arrow-js/core'
 
-const data = reactive({
+type Item = {
+  id: number
+  task: string
+}
+
+const data = reactive<{ items: Item[] }>({
   items: [
     { id: 17, task: 'Check email' },
     { id: 21, task: 'Get groceries' },
@@ -127,9 +159,14 @@ const data = reactive({
   ]
 })
 
-function addItem(e) {
-  e.preventDefault()
-  const input = document.getElementById('new-item')
+function addItem(event: Event) {
+  event.preventDefault()
+  const input = document.getElementById('new-item') as HTMLInputElement | null
+
+  if (!input) {
+    return
+  }
+
   data.items.push({
     id: Math.random(),
     task: input.value,
@@ -140,7 +177,7 @@ function addItem(e) {
 html\`
 <ul>
   \${() => data.items.map(
-      item => html\`<li>\${item.task}</li>\`.key(item.id)
+      (item) => html\`<li>\${item.task}</li>\`.key(item.id)
     )}
 </ul>
 
