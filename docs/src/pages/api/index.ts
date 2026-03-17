@@ -1,4 +1,5 @@
 import { html } from '@arrow-js/core'
+import { CopyPageMenu } from '../../components/CopyPageMenu'
 import { ScrollSpyNav } from '../../components/ScrollSpyNav'
 import type { NavGroup } from '../../components/ScrollSpyNav'
 import {
@@ -72,6 +73,14 @@ export function ApiPage() {
             class="min-w-0 max-w-3xl flex-1"
             data-disable-twoslash="true"
           >
+            <div class="flex items-start justify-between gap-4 mb-8">
+              <h1
+                class="text-4xl font-extrabold tracking-tight text-zinc-900 dark:text-white"
+              >
+                API Reference
+              </h1>
+              ${CopyPageMenu({ markdownPath: '/api.md' })}
+            </div>
             ${ReactiveApi()} ${WatchApi()} ${HtmlApi()} ${ComponentApi()}
             ${PickApi()} ${NextTickApi()} ${RenderApi()} ${BoundaryApi()}
             ${ToTemplateApi()} ${RenderDocumentApi()} ${RenderToStringApi()}

@@ -36,8 +36,8 @@ export function Hero() {
           class="mt-6 md:mt-8 text-lg md:text-xl text-zinc-600 dark:text-zinc-400 max-w-2xl mx-auto leading-relaxed text-balance"
         >
           A tiny
-          <span class="font-semibold text-arrow-500">~3KB</span>
-          type-safe library for building reactive
+          <span class="font-semibold text-arrow-500">(~5KB)</span>,
+          ridiculously-fast, type-safe library for building reactive
           interfaces in native JavaScript &mdash; with full SSR support,
           zero dependencies, and no build step required.
         </p>

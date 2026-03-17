@@ -46,14 +46,14 @@ export const FeedApp = component(() => {
     state.entries = [
       { id: state.nextId, type: msg.type, message: msg.message, time: timestamp() },
       ...state.entries,
-    ].slice(0, 30)
+    ].slice(0, 200)
     state.nextId++
   }
 
   const tick = () => {
     if (!state.running) return
     addEntry()
-    timer = window.setTimeout(tick, 1400 + Math.random() * 1200)
+    timer = window.setTimeout(tick, 20 + Math.random() * 480)
   }
 
   const start = () => {

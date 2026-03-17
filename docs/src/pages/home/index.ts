@@ -1,4 +1,5 @@
 import { html } from '@arrow-js/core'
+import { CopyPageMenu } from '../../components/CopyPageMenu'
 import { Hero } from './Hero'
 import { ScrollSpyNav } from '../../components/ScrollSpyNav'
 import type { NavGroup } from '../../components/ScrollSpyNav'
@@ -58,6 +59,9 @@ export function HomePage() {
         <div class="flex gap-12">
           ${nav.sidebar()}
           <article class="min-w-0 max-w-3xl flex-1">
+            <div class="flex justify-end mb-4">
+              ${CopyPageMenu({ markdownPath: '/docs.md' })}
+            </div>
             ${WhatIsArrow()} ${Quickstart()} ${Components()}
             ${ReactiveData()} ${WatchingData()} ${Templates()}
             ${ServerRendering()} ${Examples()}

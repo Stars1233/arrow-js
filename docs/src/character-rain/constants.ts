@@ -1,10 +1,10 @@
 // Arrow-themed JavaScript tokens grouped by syntax role (for coloring)
 export const TOKEN_GROUPS = {
-  keyword:    ['const', 'let', 'if', 'else', 'return', 'async', 'await', 'import', 'export', 'new', 'typeof'],
-  punctuation: ['{}', '[]', '()', ';', '?.', '...', '</>'],
+  keyword:    ['const', 'let', 'if', 'else', 'return', 'async', 'await', 'import', 'export', 'new'],
+  punctuation: ['{}', '[]', '()', '?.', '...', '</>'],
   operator:   ['=>', '===', '!==', '&&', '||', '??', '++', '+='],
   template:   ['${}', '@click', '@input', 'html`', '${()=>'],
-  function:   ['map', 'watch', 'reactive', 'html', 'component'],
+  function:   ['reactive()', 'watch()', 'html', 'component()', 'r()', 'w()', 't`'],
   builtin:    ['true', 'false', 'null', 'this'],
   comment:    ['//'],
 } as const
