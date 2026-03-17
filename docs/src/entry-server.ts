@@ -8,11 +8,42 @@ import {
   playgroundExampleMeta,
   playgroundExampleHref,
 } from '../play/example-meta.js'
+import type { DocsPage } from './app'
 
-function renderHead(page: { title: string; description: string }) {
+function escapeHtml(value: string) {
+  return value
+    .replaceAll('&', '&amp;')
+    .replaceAll('<', '&lt;')
+    .replaceAll('>', '&gt;')
+    .replaceAll('"', '&quot;')
+    .replaceAll("'", '&#39;')
+}
+
+function renderHead(
+  page: Pick<
+    DocsPage,
+    'title' | 'description' | 'canonicalUrl' | 'imageUrl' | 'imageAlt' | 'ogType'
+  >,
+) {
   return [
-    `<title>${page.title}</title>`,
-    `<meta name="description" content="${page.description}" />`,
+    `<title>${escapeHtml(page.title)}</title>`,
+    `<meta name="description" content="${escapeHtml(page.description)}" />`,
+    `<link rel="canonical" href="${escapeHtml(page.canonicalUrl)}" />`,
+    `<meta property="og:type" content="${escapeHtml(page.ogType)}" />`,
+    `<meta property="og:site_name" content="ArrowJS" />`,
+    `<meta property="og:title" content="${escapeHtml(page.title)}" />`,
+    `<meta property="og:description" content="${escapeHtml(page.description)}" />`,
+    `<meta property="og:url" content="${escapeHtml(page.canonicalUrl)}" />`,
+    `<meta property="og:image" content="${escapeHtml(page.imageUrl)}" />`,
+    `<meta property="og:image:type" content="image/webp" />`,
+    `<meta property="og:image:alt" content="${escapeHtml(page.imageAlt)}" />`,
+    `<meta property="og:image:width" content="1200" />`,
+    `<meta property="og:image:height" content="628" />`,
+    `<meta name="twitter:card" content="summary_large_image" />`,
+    `<meta name="twitter:title" content="${escapeHtml(page.title)}" />`,
+    `<meta name="twitter:description" content="${escapeHtml(page.description)}" />`,
+    `<meta name="twitter:image" content="${escapeHtml(page.imageUrl)}" />`,
+    `<meta name="twitter:image:alt" content="${escapeHtml(page.imageAlt)}" />`,
   ].join('')
 }
 
