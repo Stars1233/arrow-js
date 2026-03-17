@@ -1,5 +1,5 @@
 import { watch } from './reactive'
-import { isChunk, isTpl, queue, swapCleanupCollector } from './common'
+import { isChunk, isTpl, swapCleanupCollector } from './common'
 import { setAttr } from './dom'
 import { createPool } from './pool'
 import {
@@ -99,6 +99,7 @@ export interface Chunk {
   v?: Array<[Element, string, EventListener]> | null
   u?: Array<() => void> | null
   s?: ReturnType<typeof createPropsProxy>[1]
+  mk?: number
   next?: Chunk
 }
 
@@ -178,6 +179,7 @@ const chunkPool = createPool<Chunk, []>(
 let staleHead: Chunk | undefined
 let staleTail: Chunk | undefined
 let staleChunkCount = 0
+let renderedMark = 0
 
 function moveDOMRef(
   ref: DOMRef,
@@ -198,6 +200,14 @@ function moveDOMRef(
     if (!next) break
     node = next
   }
+}
+
+function markRenderedValue(value: Rendered, mark: number) {
+  ;(value as Rendered & { mk?: number }).mk = mark
+}
+
+function isRenderedValueMarked(value: Rendered, mark: number) {
+  return (value as Rendered & { mk?: number }).mk === mark
 }
 
 function getChunkProto(template: InternalTemplate): ChunkProto {
@@ -648,7 +658,7 @@ function createRenderFn(capture: HydrationCapture | null): RenderController {
         const previousLength = previous.length
         let anchor: ChildNode | undefined
         const renderedList: Rendered[] = []
-        const previousToRemove = new Set(previous)
+        const mark = ++renderedMark
         if (renderableLength > previousLength) updaterFrag ??= document.createDocumentFragment()
         for (; i < renderableLength; i++) {
           let item:
@@ -675,7 +685,7 @@ function createRenderFn(capture: HydrationCapture | null): RenderController {
           const used = patch(item, prev, anchor) as Rendered
           anchor = getNode(used)
           renderedList[i] = used
-          previousToRemove.delete(used)
+          markRenderedValue(used, mark)
         }
         if (!renderableLength) {
           getNode(previous[0]).after(
@@ -684,10 +694,12 @@ function createRenderFn(capture: HydrationCapture | null): RenderController {
         } else if (renderableLength > previousLength) {
           anchor?.after(updaterFrag!)
         }
-        previousToRemove.forEach((stale) => {
+        for (i = 0; i < previousLength; i++) {
+          const stale = previous[i]
+          if (isRenderedValueMarked(stale, mark)) continue
           forgetChunk(stale)
           unmount(stale)
-        })
+        }
         previous = renderedList
       }
     } else {
@@ -914,27 +926,40 @@ function recycleChunk(chunk: Chunk) {
   addStaleChunk(chunk)
 }
 
-const queueUnmount = queue(() => {
-  const removeItems = (
-    chunk:
-      | Chunk
-      | Text
-      | ChildNode
-      | Array<Chunk | Text | ChildNode>
-  ) => {
-    if (isChunk(chunk)) {
-      if (chunk.r) recycleChunk(chunk)
-      else destroyChunk(chunk)
-    } else if (Array.isArray(chunk)) {
-      for (let i = 0; i < chunk.length; i++) removeItems(chunk[i])
-    } else {
-      chunk.remove()
-    }
+let unmountQueued = false
+
+function removeUnmounted(
+  chunk:
+    | Chunk
+    | Text
+    | ChildNode
+    | Array<Chunk | Text | ChildNode>
+) {
+  if (isChunk(chunk)) {
+    if (chunk.r) recycleChunk(chunk)
+    else destroyChunk(chunk)
+    return
   }
+  if (Array.isArray(chunk)) {
+    for (let i = 0; i < chunk.length; i++) removeUnmounted(chunk[i])
+    return
+  }
+  chunk.remove()
+}
+
+function drainUnmountStack() {
+  unmountQueued = false
   const stack = unmountStack
   unmountStack = []
-  for (let i = 0; i < stack.length; i++) removeItems(stack[i])
-})
+  for (let i = 0; i < stack.length; i++) removeUnmounted(stack[i])
+  if (unmountStack.length) scheduleUnmountDrain()
+}
+
+function scheduleUnmountDrain() {
+  if (unmountQueued) return
+  unmountQueued = true
+  queueMicrotask(drainUnmountStack)
+}
 
 function unmount(
   chunk:
@@ -946,7 +971,7 @@ function unmount(
 ) {
   if (!chunk) return
   unmountStack.push(chunk)
-  queueUnmount()
+  scheduleUnmountDrain()
 }
 
 function isEmpty(value: unknown): value is null | undefined | '' | false {
@@ -984,9 +1009,11 @@ function adoptRenderedValue(
     return value
   }
   if (Array.isArray(value)) {
-    return value.map((item) =>
-      adoptRenderedValue(item, capture, map, visited)
-    ) as Rendered[]
+    const next = new Array(value.length) as Rendered[]
+    for (let i = 0; i < value.length; i++) {
+      next[i] = adoptRenderedValue(value[i], capture, map, visited) as Rendered
+    }
+    return next
   }
   return (map.get(value) as Text | undefined) ?? value
 }

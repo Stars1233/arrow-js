@@ -118,6 +118,9 @@ const trackedDependencies: Array<Dependencies | undefined> = []
  */
 const watchedDependencies: Array<Dependencies | undefined> = []
 const dependencyPool: Dependencies[] = []
+const arrayMutationWrappers: Array<
+  Partial<Record<PropertyKey, (...args: unknown[]) => unknown>> | undefined
+> = []
 
 /**
  * A map of child ids to their parents (a child can have multiple parents).
@@ -180,7 +183,7 @@ function get(
   key: PropertyKey,
   receiver: object
 ): unknown {
-  if (key in api) return api[key as keyof typeof api](target)
+  if (key in api) return api[key as keyof typeof api]
   const result = Reflect.get(target, key, receiver)
   let child: Reactive<ReactiveTarget> | undefined
   if (isO(result) && !isR(result)) {
@@ -213,15 +216,22 @@ function trackArray(
   value: unknown
 ) {
   if (typeof value === 'function' && isArrayMutation(key)) {
-    return (...args: unknown[]) => {
-      const result = Reflect.apply(
-        value as (...args: unknown[]) => unknown,
-        target,
-        args
-      )
-      parents[id]?.forEach(([parentId, property]) => emit(parentId, property))
-      return result
+    let wrappers = arrayMutationWrappers[id]
+    if (!wrappers) wrappers = arrayMutationWrappers[id] = {}
+    let wrapper = wrappers[key]
+    if (!wrapper) {
+      wrapper = (...args: unknown[]) => {
+        const result = Reflect.apply(
+          value as (...args: unknown[]) => unknown,
+          target,
+          args
+        )
+        emitParents(id)
+        return result
+      }
+      wrappers[key] = wrapper
     }
+    return wrapper
   }
   if (isComputed(value)) return readComputed(value, id, key)
   return value
@@ -269,7 +279,7 @@ function set(
   )
   // If the array length is modified, notify all parents
   if (Array.isArray(target) && key === 'length') {
-    parents[id]?.forEach(([parentId, property]) => emit(parentId, property))
+    emitParents(id)
   }
   return didSucceed
 }
@@ -394,34 +404,49 @@ function emit(
     if (typeof propertyListeners === 'function') {
       propertyListeners(newValue, oldValue)
     } else {
-      propertyListeners.forEach((callback) => callback(newValue, oldValue))
+      for (const callback of propertyListeners) callback(newValue, oldValue)
     }
   }
   if (notifyParents) {
-    parents[id]?.forEach(([parentId, property]) => emit(parentId, property))
+    emitParents(id)
   }
+}
+
+function emitParents(id: number) {
+  const parentEntries = parents[id]
+  if (!parentEntries) return
+  for (let i = 0; i < parentEntries.length; i++) {
+    const [parentId, property] = parentEntries[i]
+    emit(parentId, property)
+  }
+}
+
+function reactiveOn(
+  this: ReactiveTarget,
+  property: PropertyKey,
+  callback: PropertyObserver<unknown>
+) {
+  addListener(listeners[getId(this as object)] as ListenerMap, property, callback)
+}
+
+function reactiveOff(
+  this: ReactiveTarget,
+  property: PropertyKey,
+  callback: PropertyObserver<unknown>
+) {
+  removeListener(
+    listeners[getId(this as object)] as ListenerMap,
+    property,
+    callback
+  )
 }
 
 /**
  * The public reactive API for a reactive object.
  */
 const api = {
-  $on:
-    (target: ReactiveTarget): ReactiveAPI<ReactiveTarget>['$on'] =>
-    (property, callback) =>
-      addListener(
-        listeners[getId(target)] as ListenerMap,
-        property as PropertyKey,
-        callback as PropertyObserver<unknown>
-      ),
-  $off:
-    (target: ReactiveTarget): ReactiveAPI<ReactiveTarget>['$off'] =>
-    (property, callback) =>
-      removeListener(
-        listeners[getId(target)] as ListenerMap,
-        property as PropertyKey,
-        callback as PropertyObserver<unknown>
-      ),
+  $on: reactiveOn,
+  $off: reactiveOff,
 }
 
 /**
