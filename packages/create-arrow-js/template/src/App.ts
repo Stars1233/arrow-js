@@ -36,7 +36,7 @@ export const App = component(() =>
       </div>
 
       <div class="hero__grid">
-        ${CounterCard(state)}
+        ${CounterCard(state as unknown as Record<string, unknown>)}
         ${boundary(WelcomeCard())}
       </div>
     </section>

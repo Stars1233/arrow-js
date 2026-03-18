@@ -12,6 +12,7 @@ const arrowPackages = [
   '@arrow-js/framework',
   '@arrow-js/hydrate',
   '@arrow-js/ssr',
+  '@arrow-js/skill',
 ] as const
 
 const tempDirs: string[] = []
@@ -95,11 +96,16 @@ async function expectFile(rootDir: string, relativePath: string) {
 }
 
 async function packWorkspacePackage(packageName: string, packDir: string) {
+  const packageDirectory = path.resolve(
+    repoRoot,
+    'packages',
+    packageName.startsWith('@arrow-js/') ? packageName.split('/')[1] : packageName
+  )
   const { stdout } = await execa(
     'pnpm',
-    ['--filter', packageName, 'pack', '--json', '--pack-destination', packDir],
+    ['pack', '--json', '--pack-destination', packDir],
     {
-      cwd: repoRoot,
+      cwd: packageDirectory,
     }
   )
   const details = JSON.parse(stdout) as { filename: string }
@@ -116,7 +122,12 @@ async function rewriteArrowDependencies(
 
   for (const packageName of arrowPackages) {
     const tarball = `file:${normalizePath(tarballs[packageName])}`
-    packageJson.dependencies[packageName] = tarball
+    if (packageJson.dependencies?.[packageName]) {
+      packageJson.dependencies[packageName] = tarball
+    }
+    if (packageJson.devDependencies?.[packageName]) {
+      packageJson.devDependencies[packageName] = tarball
+    }
     overrides[packageName] = tarball
   }
 

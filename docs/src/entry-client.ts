@@ -2,6 +2,19 @@ import '@shikijs/twoslash/style-rich.css'
 import { hydrate, readPayload } from '@arrow-js/hydrate'
 import { createPage } from './app'
 
+type NavigatorWithConnection = Navigator & {
+  connection?: {
+    saveData?: boolean
+  }
+}
+
+type IdleWindow = Window & typeof globalThis & {
+  requestIdleCallback?: (
+    callback: IdleRequestCallback,
+    options?: IdleRequestOptions
+  ) => number
+}
+
 const payload = readPayload()
 const root = document.getElementById('app')
 
@@ -29,9 +42,11 @@ document.addEventListener('mouseenter', (e) => {
 
 const hero = document.getElementById('hero')
 if (hero) {
+  const browserNavigator = navigator as NavigatorWithConnection
+  const idleWindow = window as IdleWindow
   const canLoadCharacterRain =
     !window.matchMedia('(prefers-reduced-motion: reduce)').matches &&
-    navigator.connection?.saveData !== true
+    browserNavigator.connection?.saveData !== true
 
   if (canLoadCharacterRain) {
     const loadCharacterRain = async () => {
@@ -40,14 +55,14 @@ if (hero) {
     }
 
     const scheduleCharacterRain = () => {
-      if ('requestIdleCallback' in window) {
-        window.requestIdleCallback(() => {
+      if (typeof idleWindow.requestIdleCallback === 'function') {
+        idleWindow.requestIdleCallback(() => {
           void loadCharacterRain()
         }, { timeout: 1500 })
         return
       }
 
-      window.setTimeout(() => {
+      setTimeout(() => {
         void loadCharacterRain()
       }, 500)
     }

@@ -19,10 +19,10 @@ export function highlightedSection(section: () => ArrowTemplate, idPrefix: strin
     {
       idPrefix,
       serialize: (value) => typeof value === 'string' ? value : undefined,
-      deserialize: (snapshot) => snapshot,
+      deserialize: (snapshot) => snapshot ?? '',
       render: (value) => typeof value === 'string' ? rawHtml(value) : value,
     }
   )
 
-  return () => HighlightedSection()
+  return () => HighlightedSection({})
 }

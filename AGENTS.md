@@ -49,6 +49,8 @@ Publishing is handled by `.github/workflows/publish.yml`.
 - It installs `npm@latest`
 - It does not use an npm token
 - It blocks plain `vX.Y.Z` releases unless the tagged commit is on `main`
+- It publishes each package in its own job, with dependencies running before dependants
+- `create-arrow-js` is unscoped and still needs its own npm trusted publisher configured to this repo/workflow
 
 ## Public package set
 

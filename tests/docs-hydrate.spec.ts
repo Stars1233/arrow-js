@@ -39,10 +39,10 @@ describe('docs hydration', () => {
   })
 
   it('renders the shared header controls in SSR output', async () => {
-    const page = routeToPage('/docs/')
+    const page = await routeToPage('/docs/')
     const ssr = await renderToString(page.view)
 
-    expect(ssr.html).toContain('aria-label="GitHub"')
+    expect(ssr.html).toMatch(/aria-label="GitHub[^"]*"/)
     expect(ssr.html).toContain('aria-label="Follow on X"')
     expect(ssr.html).toContain('aria-label="Toggle theme"')
     expect(ssr.html).toContain('class="header-nav-link"')
@@ -64,14 +64,14 @@ describe('docs hydration', () => {
 
   it('repairs a missing home counter without replacing intact siblings', async () => {
     const root = document.createElement('div')
-    const serverPage = routeToPage('/')
+    const serverPage = await routeToPage('/')
     const ssr = await renderToString(serverPage.view)
     root.innerHTML = ssr.html
 
     const existingHero = root.querySelector('#hero')
     root.querySelector('#hero-counter')?.remove()
 
-    const clientPage = routeToPage('/')
+    const clientPage = await routeToPage('/')
     const result = await hydrate(root, clientPage.view, ssr.payload)
 
     expect(result.adopted).toBe(true)
@@ -88,12 +88,12 @@ describe('docs hydration', () => {
 
 async function hydratePage(path: string) {
   const root = document.createElement('div')
-  const serverPage = routeToPage(path)
+  const serverPage = await routeToPage(path)
   const ssr = await renderToString(serverPage.view)
   root.innerHTML = ssr.html
 
   const existing = root.firstElementChild
-  const clientPage = routeToPage(path)
+  const clientPage = await routeToPage(path)
   const result = await hydrate(root, clientPage.view, ssr.payload)
 
   return {

@@ -1,7 +1,7 @@
 export type SupportedLanguage = 'js' | 'ts' | 'html' | 'shell'
 
-export function normalizeLanguage(language: string): SupportedLanguage {
-  const lang = language.replace('language-', '')
+export function normalizeLanguage(language: string | undefined): SupportedLanguage {
+  const lang = (language ?? 'ts').replace('language-', '')
 
   switch (lang) {
     case 'javascript':

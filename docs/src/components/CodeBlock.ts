@@ -66,7 +66,7 @@ const HighlightedCodeBlockComponent = component<
   {
     idPrefix: 'code',
     serialize: (value) => typeof value === 'string' ? value : undefined,
-    deserialize: (snapshot) => snapshot,
+    deserialize: (snapshot) => snapshot ?? '',
     render: (value) => typeof value === 'string' ? rawHtml(value) : value,
   }
 )
