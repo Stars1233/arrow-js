@@ -1,7 +1,6 @@
 import { watch } from './reactive'
 import { isChunk, isTpl, swapCleanupCollector } from './common'
 import { setAttr } from './dom'
-import { createPool } from './pool'
 import {
   adoptCapturedChunk,
   getHydrationCapture,
@@ -91,11 +90,7 @@ export interface Chunk {
   b: boolean
   r: boolean
   st: boolean
-  sqp?: Chunk
-  sqn?: Chunk
-  bkp?: Chunk
   bkn?: Chunk
-  bp?: StaleBucket
   v?: Array<[Element, string]> | null
   u?: Array<() => void> | null
   s?: ReturnType<typeof createPropsProxy>[1]
@@ -115,7 +110,7 @@ interface DOMRef {
   l: ChildNode | null
 }
 
-const eventBindingsKey = Symbol('arrowEventBindings')
+const eventBindingsKey = Symbol()
 
 interface EventBindingMeta {
   c: Chunk
@@ -144,7 +139,6 @@ type InternalTemplate = ArrowTemplate & {
 
 interface StaleBucket {
   head?: Chunk
-  tail?: Chunk
 }
 
 let bindingStackPos = -1
@@ -154,44 +148,15 @@ const nodeStack: Node[] = []
 const delimiter = '¤'
 const delimiterComment = `<!--${delimiter}-->`
 const initialChunkPoolSize = 1024
-const staleChunkSoftCap = 8192
 
 const chunkMemo: Record<string, ChunkProto> = {}
 const chunkMemoByRef = new WeakMap<ReadonlyArray<string>, ChunkProto>()
 const staleById = new Map<Exclude<ArrowTemplateId, undefined>, Chunk>()
 const staleBySignature = new Map<string, StaleBucket>()
-const chunkPool = createPool<Chunk, []>(
-  initialChunkPoolSize,
-  () => ({
-    paths: [[], []],
-    dom: null as unknown as DocumentFragment,
-    ref: { f: null, l: null },
-    _t: null as unknown as ArrowTemplate,
-    e: -1,
-    g: '',
-    b: false,
-    r: true,
-    st: false,
-    u: null,
-    v: null,
-    s: undefined,
-    k: undefined,
-    i: undefined,
-    sqp: undefined,
-    sqn: undefined,
-    bkp: undefined,
-    bkn: undefined,
-    bp: undefined,
-    next: undefined,
-  }),
-  function allocate() {
-    return this.next()
-  }
-)
-let staleHead: Chunk | undefined
-let staleTail: Chunk | undefined
-let staleChunkCount = 0
+let chunkPoolHead: Chunk | undefined
 let renderedMark = 0
+
+growChunkPool(initialChunkPoolSize)
 
 function moveDOMRef(
   ref: DOMRef,
@@ -267,7 +232,46 @@ function syncTemplateToChunk(
 }
 
 function takeChunkRecord(): Chunk {
-  return chunkPool.allocate()
+  if (!chunkPoolHead) growChunkPool(initialChunkPoolSize)
+  const chunk = chunkPoolHead!
+  chunkPoolHead = chunk.next
+  chunk.next = undefined
+  return chunk
+}
+
+function growChunkPool(size: number) {
+  let head: Chunk | undefined
+  let tail: Chunk | undefined
+  for (let i = 0; i < size; i++) {
+    const chunk = {
+      paths: [[], []],
+      dom: null as unknown as DocumentFragment,
+      ref: { f: null, l: null },
+      _t: null as unknown as ArrowTemplate,
+      e: -1,
+      g: '',
+      b: false,
+      r: true,
+      st: false,
+      u: null,
+      v: null,
+      s: undefined,
+      k: undefined,
+      i: undefined,
+      bkn: undefined,
+      next: undefined,
+    } as Chunk
+    if (tail) tail.next = chunk
+    else head = chunk
+    tail = chunk
+  }
+  if (tail) tail.next = chunkPoolHead
+  chunkPoolHead = head
+}
+
+function freeChunk(chunk: Chunk) {
+  chunk.next = chunkPoolHead
+  chunkPoolHead = chunk
 }
 
 function configureChunk(
@@ -287,11 +291,7 @@ function configureChunk(
   chunk.u = null
   chunk.v = null
   chunk.s = undefined
-  chunk.bp = undefined
-  chunk.bkp = undefined
   chunk.bkn = undefined
-  chunk.sqp = undefined
-  chunk.sqn = undefined
   syncTemplateToChunk(template, chunk)
 }
 
@@ -299,7 +299,7 @@ function acquireChunk(template: InternalTemplate): Chunk {
   const proto = getChunkProto(template)
   const exact = template._i === undefined ? undefined : staleById.get(template._i)
   if (exact && exact.g !== proto.signature) {
-    throw new Error(`Template id "${template._i}" was reused with a different static signature.`)
+    throw new Error('Template id shape mismatch.')
   }
   if (exact && exact.g === proto.signature && exact.r) {
     removeStaleChunk(exact)
@@ -320,8 +320,7 @@ function acquireChunk(template: InternalTemplate): Chunk {
 
 function takeStaleChunk(signature: string): Chunk | undefined {
   const bucket = staleBySignature.get(signature)
-  let chunk = bucket?.head
-  while (chunk && !chunk.st) chunk = chunk.bkn
+  const chunk = bucket?.head
   if (!chunk) return
   removeStaleChunk(chunk)
   return chunk
@@ -336,56 +335,33 @@ function addStaleChunk(chunk: Chunk) {
     bucket = {}
     staleBySignature.set(signature, bucket)
   }
-  chunk.bp = bucket
-  chunk.bkp = bucket.tail
-  chunk.bkn = undefined
-  if (bucket.tail) bucket.tail.bkn = chunk
-  else bucket.head = chunk
-  bucket.tail = chunk
-
-  chunk.sqp = staleTail
-  chunk.sqn = undefined
-  if (staleTail) staleTail.sqn = chunk
-  else staleHead = chunk
-  staleTail = chunk
+  chunk.bkn = bucket.head
+  bucket.head = chunk
 
   if (chunk.i !== undefined) staleById.set(chunk.i, chunk)
-  staleChunkCount++
-  trimStaleChunks()
 }
 
 function removeStaleChunk(chunk: Chunk) {
   if (!chunk.st) return
-  const bucket = chunk.bp
+  const bucket = staleBySignature.get(chunk.g)
   if (bucket) {
-    if (chunk.bkp) chunk.bkp.bkn = chunk.bkn
-    else bucket.head = chunk.bkn
-    if (chunk.bkn) chunk.bkn.bkp = chunk.bkp
-    else bucket.tail = chunk.bkp
-    if (!bucket.head) staleBySignature.delete(chunk.g)
+    let previous: Chunk | undefined
+    let current = bucket.head
+    while (current && current !== chunk) {
+      previous = current
+      current = current.bkn
+    }
+    if (current) {
+      if (previous) previous.bkn = current.bkn
+      else bucket.head = current.bkn
+      if (!bucket.head) staleBySignature.delete(chunk.g)
+    }
   }
-  if (chunk.sqp) chunk.sqp.sqn = chunk.sqn
-  else staleHead = chunk.sqn
-  if (chunk.sqn) chunk.sqn.sqp = chunk.sqp
-  else staleTail = chunk.sqp
   if (chunk.i !== undefined && staleById.get(chunk.i) === chunk) {
     staleById.delete(chunk.i)
   }
   chunk.st = false
-  chunk.bp = undefined
-  chunk.bkp = undefined
   chunk.bkn = undefined
-  chunk.sqp = undefined
-  chunk.sqn = undefined
-  staleChunkCount--
-}
-
-function trimStaleChunks() {
-  while (staleChunkCount > staleChunkSoftCap && staleHead) {
-    const chunk = staleHead
-    removeStaleChunk(chunk)
-    destroyChunk(chunk)
-  }
 }
 
 function dispatchChunkEvent(this: Element, evt: Event) {
@@ -957,7 +933,7 @@ function destroyChunk(chunk: Chunk) {
   chunk.b = false
   chunk.r = true
   chunk.g = ''
-  chunkPool.free(chunk)
+  freeChunk(chunk)
 }
 
 function recycleChunk(chunk: Chunk) {
@@ -1058,30 +1034,7 @@ function adoptRenderedValue(
   return (map.get(value) as Text | undefined) ?? value
 }
 
-export function createChunk(
-  rawStrings: TemplateStringsArray | string[]
-): Omit<Chunk, 'ref'> & { ref: DOMRef } {
-  const proto = resolveChunkProto(rawStrings)
-  const chunk = takeChunkRecord()
-  chunk.paths = proto.paths
-  chunk.g = proto.signature
-  chunk.dom = proto.template.content.cloneNode(true) as DocumentFragment
-  chunk.ref.f = chunk.dom.firstChild as ChildNode | null
-  chunk.ref.l = chunk.dom.lastChild as ChildNode | null
-  chunk.e = createExpressionBlock(proto.expressions)
-  chunk.b = false
-  chunk.r = true
-  chunk.st = false
-  chunk.u = null
-  chunk.v = null
-  chunk.s = undefined
-  chunk.k = undefined
-  chunk.i = undefined
-  chunk._t = null as unknown as ArrowTemplate
-  return chunk as Omit<Chunk, 'ref'> & { ref: DOMRef }
-}
-
-export function createPaths(dom: DocumentFragment): Chunk['paths'] {
+function createPaths(dom: DocumentFragment): Chunk['paths'] {
   const pathTape: number[] = []
   const attrNames: string[] = []
   const path: number[] = []
@@ -1124,19 +1077,4 @@ export function createPaths(dom: DocumentFragment): Chunk['paths'] {
     path.pop()
   }
   return [pathTape, attrNames]
-}
-
-export function getPath(node: Node): number[] {
-  const path: number[] = []
-  while (node.parentNode) {
-    const children = node.parentNode.childNodes
-    for (let i = 0; i < children.length; i++) {
-      if (children[i] === node) {
-        path.unshift(i)
-        break
-      }
-    }
-    node = node.parentNode
-  }
-  return path
 }

@@ -66,7 +66,6 @@ export interface PropertyObserver<T> {
  * ```
  */
 type Dependencies = Array<number | PropertyKey>
-export type TrackedDependencies = Dependencies
 
 type ListenerSlot =
   | PropertyObserver<unknown>
@@ -146,7 +145,7 @@ export function reactive<T extends ReactiveTarget, TValue>(
   // The data is already a reactive object, so return it.
   if (isR(data)) return data as Reactive<T>
   // Only valid objects can be reactive.
-  if (!isO(data)) throw Error('Non object passed to reactive.')
+  if (!isO(data)) throw Error('Expected object.')
   // Create a new slot in the listeners registry and then store the relationship
   // of this object to its index.
   const id = ++index
@@ -459,41 +458,11 @@ function track(id: number, property: PropertyKey): void {
   trackedDependencies[trackKey]!.push(id, property)
 }
 
-export function withoutTracking<T>(fn: () => T): T {
-  const previous = trackKey
-  trackKey = 0
-  try {
-    return fn()
-  } finally {
-    trackKey = previous
-  }
-}
-
 /**
  * Begin tracking reactive dependencies.
  */
 function startTracking() {
   trackedDependencies[++trackKey] = takeDependencies()
-}
-
-export function captureDependencies<F extends (...args: unknown[]) => unknown>(
-  effect: F
-): [returnValue: ReturnType<F>, deps: TrackedDependencies] {
-  const key = ++trackKey
-  const deps = (trackedDependencies[key] = takeDependencies())
-  try {
-    return [(effect as CallableFunction)() as ReturnType<F>, deps]
-  } catch (error) {
-    trackedDependencies[key] = undefined
-    trackKey--
-    releaseDependencies(deps)
-    throw error
-  } finally {
-    if (trackedDependencies[key]) {
-      trackedDependencies[key] = undefined
-      trackKey--
-    }
-  }
 }
 
 /**
@@ -540,18 +509,6 @@ function flushListeners(
     removeListener(listeners[deps[i] as number], deps[i + 1], callback)
   }
   releaseDependencies(deps)
-}
-
-export function observeDependencies(
-  deps: TrackedDependencies,
-  callback: PropertyObserver<unknown>
-): () => void {
-  const len = deps.length
-  if (!len) return () => releaseDependencies(deps)
-  for (let i = 0; i < len; i += 2) {
-    addListener(listeners[deps[i] as number], deps[i + 1], callback)
-  }
-  return () => flushListeners(deps, callback)
 }
 
 function addListener(

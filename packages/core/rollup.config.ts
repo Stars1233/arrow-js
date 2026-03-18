@@ -39,6 +39,11 @@ const config = defineConfig({
   input,
   output,
   plugins,
+  treeshake: {
+    moduleSideEffects: false,
+    propertyReadSideEffects: false,
+    tryCatchDeoptimization: false,
+  },
 })
 
 export default config

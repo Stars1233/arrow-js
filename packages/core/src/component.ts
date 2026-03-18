@@ -105,8 +105,6 @@ export function pick<T extends object, K extends keyof T>(
     : source
 }
 
-export const props = pick
-
 export function component(factory: () => ArrowTemplate): Component
 export function component<T extends ReactiveTarget>(
   factory: (props: Props<T>) => ArrowTemplate
@@ -129,7 +127,7 @@ export function component<T extends ReactiveTarget, TValue, TSnapshot = TValue>(
 ): Component | ComponentWithProps<T> {
   if (options || factory instanceof AsyncFunction) {
     if (!asyncComponentInstaller) {
-      throw new Error('Import Arrow async runtime to use async components.')
+      throw new Error('Async runtime required.')
     }
 
     return asyncComponentInstaller(

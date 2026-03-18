@@ -4,7 +4,7 @@ import { Reactive, PropertyObserver, ReactiveTarget } from './reactive'
 /**
  * A queue of expressions to run as soon as an async slot opens up.
  */
-const queueMarker = Symbol('arrowQueued')
+const queueMarker = Symbol()
 type QueuedFunction = CallableFunction & {
   [queueMarker]?: boolean
   _n?: unknown

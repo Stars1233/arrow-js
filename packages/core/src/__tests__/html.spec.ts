@@ -1,7 +1,6 @@
 import { html, reactive, nextTick, ArrowTemplate } from '..'
 import { click, setValue } from './utils/events'
 import { describe, it, expect, vi } from 'vitest'
-import { createChunk, getPath } from '../html'
 import {
   createHydrationCapture,
   installHydrationCaptureProvider,
@@ -10,64 +9,6 @@ interface User {
   name: string
   id: number
 }
-
-describe('getPath', () => {
-  it('can locate the path of items at the root', () => {
-    const template = document.createElement('template')
-    template.innerHTML = `<div></div><!---->`
-    const comment = template.content.childNodes[1]
-    const path = getPath(comment)
-    expect(path).toEqual([1])
-  })
-  it('can locate the path of items at the root', () => {
-    const template = document.createElement('template')
-    template.innerHTML = `<div><h1><span>here</span>there<input></h1></div>`
-    const input = template.content.querySelector('input')!
-    const path = getPath(input)
-    expect(path).toEqual([0, 0, 2])
-  })
-})
-
-describe('createChunk', () => {
-  it('can create a dom fragment from a simple static template', () => {
-    const chunk = createChunk(['<div><h1></h1></div>'])
-    expect(chunk.dom).toBeInstanceOf(DocumentFragment)
-    expect(chunk.dom.childNodes[0]).toBeInstanceOf(HTMLDivElement)
-    expect(chunk.dom.childNodes[0].childNodes[0]).toBeInstanceOf(
-      HTMLHeadingElement
-    )
-    expect(chunk.paths).toEqual([[], []])
-  })
-  it('can create a dom fragment with a basic expression in the body', () => {
-    const chunk = createChunk(['<div>', '</div>'])
-    expect(chunk.dom).toBeInstanceOf(DocumentFragment)
-    expect(chunk.dom.childNodes[0]).toBeInstanceOf(HTMLDivElement)
-    expect(chunk.dom.childNodes[0].childNodes[0]).toBeInstanceOf(Comment)
-    expect(chunk.paths).toEqual([[0, 2, 0, 0, 0], []])
-  })
-  it('can create a dom fragment with a basic expression in the body and an attribute', () => {
-    const chunk = createChunk(['<div data-foo="', '">', '</div>'])
-    expect(chunk.dom).toBeInstanceOf(DocumentFragment)
-    expect(chunk.dom.childNodes[0]).toBeInstanceOf(HTMLDivElement)
-    expect(chunk.dom.childNodes[0].childNodes.length).toBe(1)
-    const mountPoint = document.createElement('div')
-    mountPoint.appendChild(chunk.dom)
-    // expect(mountPoint.innerHTML).toBe('<div data-foo="❲❍❳"><!--➳❍--></div>')
-    expect(chunk.paths).toEqual([[0, 1, 0, 1, 1, 1, 0, 0], ['data-foo']])
-  })
-  it('can create a dom fragment with a multiple basic expression in the body and an attributes', () => {
-    // prettier-ignore
-    const chunk = createChunk(['<div data-foo="', "\" hidden=\"", '">', "<span class=\"", "\" style=\"", "\">", '</span></div>'])
-    expect(chunk.dom).toBeInstanceOf(DocumentFragment)
-    expect(chunk.dom.childNodes[0]).toBeInstanceOf(HTMLDivElement)
-    const mountPoint = document.createElement('div')
-    mountPoint.appendChild(chunk.dom)
-    expect(chunk.paths).toEqual([
-      [0, 1, 0, 1, 1, 0, 2, 1, 1, 0, 0, 1, 1, 1, 3, 2, 0, 4, 2, 1, 0, 0],
-      ['data-foo', 'hidden', 'class', 'style'],
-    ])
-  })
-})
 
 describe('hydration capture', () => {
   it('records adoption hooks only when a capture provider is active', () => {
@@ -1320,7 +1261,7 @@ describe('html', () => {
     await nextTick()
 
     expect(() => html`<span>beta</span>`.id('shape-check')(host)).toThrow(
-      /different static signature/
+      /shape mismatch/
     )
   })
 })

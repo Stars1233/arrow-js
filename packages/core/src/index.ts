@@ -1,4 +1,4 @@
-import { component, pick, props } from './component'
+import { component, pick } from './component'
 import { html } from './html'
 import { reactive, watch } from './reactive'
 
@@ -8,7 +8,7 @@ export {
   html,
   html as t,
   pick,
-  props,
+  pick as props,
   reactive,
   reactive as r,
   watch,
