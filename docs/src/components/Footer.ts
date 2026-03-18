@@ -4,7 +4,7 @@ export function Footer() {
   return html`
     <footer class="site-footer border-t border-zinc-200 dark:border-zinc-800 mt-24">
       <div
-        class="max-w-7xl mx-auto px-6 py-10 flex flex-col sm:flex-row items-center justify-between gap-4 text-sm"
+        class="max-w-7xl mx-auto px-4 sm:px-6 py-10 flex flex-col sm:flex-row items-center justify-between gap-4 text-sm"
       >
         <p>
           Built with Arrow by

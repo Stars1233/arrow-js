@@ -78,11 +78,15 @@ export function Hero(options: { highlightCode?: boolean } = {}) {
           ${CodeBlock({
             lang: 'ts',
             wrapperClass: 'hero-code',
-            code: `import { component, html, reactive } from '@arrow-js/core'
+            code: `import { html, reactive } from '@arrow-js/core'
 
 const data = reactive({ count: 0 })
 
-html&#96;&#36;{Counter()}&#96;(document.body)`,
+html\`
+  &lt;button @click="\${() =&gt; data.count++}"&gt;
+    Clicked \${() =&gt; data.count} times
+  &lt;/button&gt;
+\`(document.body)`,
           }, highlightCode)}
           <div
             class="border-t border-zinc-200 dark:border-zinc-800 px-5 py-4 rounded-b-xl bg-white dark:bg-zinc-900/80"

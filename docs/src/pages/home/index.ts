@@ -66,7 +66,7 @@ export function HomePage(options: { highlightCode?: boolean } = {}) {
     <div>
       ${Hero({ highlightCode })} ${nav.mobile()}
 
-      <div class="max-w-7xl mx-auto px-6 pt-20 pb-12">
+      <div class="max-w-7xl mx-auto px-4 sm:px-6 pt-20 pb-12">
         <div class="flex gap-12">
           ${nav.sidebar()}
           <article class="min-w-0 max-w-3xl flex-1">

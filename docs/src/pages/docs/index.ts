@@ -26,7 +26,7 @@ export function DocsPage(options: { highlightCode?: boolean } = {}) {
   const ExamplesSection = highlightCode ? HighlightedExamples : Examples
 
   return html`
-    <div class="max-w-7xl mx-auto px-6 py-12">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 py-12">
       <div class="flex gap-12">
         ${Navigation()}
         <article class="min-w-0 max-w-3xl flex-1">

@@ -14,7 +14,7 @@ const TWOSLASH_TYPES_PATH = '/arrow-docs.d.ts'
 const TWOSLASH_REFERENCE = `/// <reference path="${TWOSLASH_TYPES_PATH}" />\n`
 const TYPESCRIPT_CDN_PREFIX = 'https://playgroundcdn.typescriptlang.org/cdn/'
 const SHIKI_THEMES = {
-  light: 'github-light-high-contrast',
+  light: 'one-light',
   dark: 'one-dark-pro',
 } as const
 const TYPESCRIPT_OPTIONAL_LIBS = new Set([

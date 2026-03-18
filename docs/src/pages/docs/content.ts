@@ -175,15 +175,13 @@ await hydrate(root, createApp(), readPayload())`,
           Editor support
         </h3>
         <p>
-          Since Arrow uses tagged template literals, its syntax is very similar
-          to lit-html. If you are using VSCode, install the
+          Install the official
           <a
-            href="https://marketplace.visualstudio.com/items?itemName=bierner.lit-html"
+            href="https://marketplace.visualstudio.com/items?itemName=StandardAgents.arrowjs-syntax"
             class="text-arrow-550 dark:text-arrow-400 underline underline-offset-2"
-          >
-            lit-html
-          </a>
-          extension to enable syntax highlighting on <code>html</code> blocks.
+          >ArrowJS Syntax</a>
+          extension for VSCode to get syntax highlighting and
+          autocomplete inside <code>html</code> template literals.
           Arrow also ships TypeScript definitions for full editor support.
         </p>
       </div>

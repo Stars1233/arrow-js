@@ -29,7 +29,7 @@ export function Header(url: string = '/') {
     <header
       class="fixed top-0 left-0 right-0 z-50 border-b border-zinc-200/60 dark:border-zinc-800/60 bg-white/80 dark:bg-zinc-950/80 backdrop-blur-xl"
     >
-      <div class="max-w-7xl mx-auto px-6 h-16 flex items-center justify-between">
+      <div class="max-w-7xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between">
         <a
           href="/"
           class="flex items-center hover:opacity-80 transition-opacity text-zinc-900 dark:text-white"
@@ -66,6 +66,7 @@ export function Header(url: string = '/') {
             href="/play/"
             class="header-nav-link"
             data-active="${isPlay ? '' : false}"
+            data-hide-play
           >
             Playground
           </a>
