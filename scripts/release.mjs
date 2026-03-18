@@ -35,10 +35,12 @@ if (args[0] === 'sync') {
 
 await runInteractiveRelease({
   requestedTag: readFlagValue(args, '--tag'),
+  requestedBump: readFlagValue(args, '--bump'),
   dryRun: args.includes('--dry-run'),
+  skipConfirm: args.includes('--yes'),
 })
 
-async function runInteractiveRelease({ requestedTag, dryRun }) {
+async function runInteractiveRelease({ requestedTag, requestedBump, dryRun, skipConfirm }) {
   if (!isWorkingDirectoryClean()) {
     fail('Working directory is not clean. Commit or stash changes first.')
   }
@@ -46,14 +48,16 @@ async function runInteractiveRelease({ requestedTag, dryRun }) {
   const branch = exec('git branch --show-current')
   const stableVersion = getStableVersion(readJson(rootPackagePath).version || readPackageVersion('packages/core'))
   const releaseTag = await resolveReleaseTag(branch, requestedTag)
-  const bumpType = await promptChoice(
-    'Select version bump type:',
-    [
-      { key: '1', value: 'patch', label: `patch (${stableVersion} -> ${bumpVersion(stableVersion, 'patch')})` },
-      { key: '2', value: 'minor', label: `minor (${stableVersion} -> ${bumpVersion(stableVersion, 'minor')})` },
-      { key: '3', value: 'major', label: `major (${stableVersion} -> ${bumpVersion(stableVersion, 'major')})` },
-    ]
-  )
+  const bumpType = requestedBump
+    ? validateBumpType(requestedBump)
+    : await promptChoice(
+        'Select version bump type:',
+        [
+          { key: '1', value: 'patch', label: `patch (${stableVersion} -> ${bumpVersion(stableVersion, 'patch')})` },
+          { key: '2', value: 'minor', label: `minor (${stableVersion} -> ${bumpVersion(stableVersion, 'minor')})` },
+          { key: '3', value: 'major', label: `major (${stableVersion} -> ${bumpVersion(stableVersion, 'major')})` },
+        ]
+      )
   const nextStable = bumpVersion(stableVersion, bumpType)
   const commitHash = exec('git rev-parse --short=7 HEAD')
   const version = releaseTag === 'latest'
@@ -72,7 +76,9 @@ async function runInteractiveRelease({ requestedTag, dryRun }) {
     ].join('\n')
   )
 
-  const confirmed = await promptConfirm(dryRun ? 'Continue with dry run?' : 'Continue with release?')
+  const confirmed = skipConfirm
+    ? true
+    : await promptConfirm(dryRun ? 'Continue with dry run?' : 'Continue with release?')
   if (!confirmed) {
     process.stdout.write('Release cancelled.\n')
     process.exit(0)
@@ -148,6 +154,14 @@ function validateReleaseTag(branch, requestedTag) {
   if (requestedTag === 'latest' && branch !== 'main') {
     fail('Cannot publish latest from a non-main branch.')
   }
+}
+
+function validateBumpType(value) {
+  if (!['patch', 'minor', 'major'].includes(value)) {
+    fail(`Unknown bump type "${value}". Use patch, minor, or major.`)
+  }
+
+  return value
 }
 
 function getStableVersion(version) {
