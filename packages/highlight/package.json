@@ -18,6 +18,8 @@
   },
   "files": [
     "src",
-    "README.md"
+    "README.md",
+    "LICENSE.txt",
+    "arrow-logo.png"
   ]
 }

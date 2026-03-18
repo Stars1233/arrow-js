@@ -1,6 +1,8 @@
 {
   "name": "@arrow-js/framework",
   "version": "1.0.0-alpha.9",
+  "description": "Framework runtime for async ArrowJS components, boundaries, and document rendering.",
+  "license": "MIT",
   "type": "module",
   "repository": {
     "type": "git",

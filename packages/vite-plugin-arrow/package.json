@@ -1,6 +1,8 @@
 {
   "name": "@arrow-js/vite-plugin-arrow",
   "version": "1.0.0-alpha.9",
+  "description": "Vite integration for ArrowJS projects.",
+  "license": "MIT",
   "type": "module",
   "repository": {
     "type": "git",

@@ -1,11 +1,25 @@
 # @arrow-js/highlight
 
-ArrowJS-specific syntax highlighting helpers for embedded HTML inside `html\`...\`` and `t\`...\`` template literals.
+![ArrowJS](./arrow-logo.png)
 
-This package provides:
+ArrowJS is a tiny, type-safe reactive UI runtime built around JavaScript modules, template literals, and the DOM.
 
-- a tokenizer for Arrow template HTML segments
-- shared token types for editor adapters
-- a DOM decorator for already-rendered code blocks
+[Docs](https://arrow-js.com) · [API Reference](https://arrow-js.com/api) · [Playground](https://arrow-js.com/play/)
 
-It is intended for ArrowJS tooling such as docs rendering, playgrounds, and editor integrations.
+## What this package does
+
+`@arrow-js/highlight` provides syntax-highlighting helpers for Arrow template literals.
+
+It includes:
+
+- tokenization for HTML inside `html\`...\`` and `t\`...\`` templates
+- shared token metadata for editor and docs integrations
+- DOM decorators for highlighted code blocks
+
+Use it when you are building editor tooling, docs, playgrounds, or other Arrow-aware code presentation tools.
+
+## Install
+
+```sh
+pnpm add @arrow-js/highlight
+```

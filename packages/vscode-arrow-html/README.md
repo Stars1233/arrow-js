@@ -1,8 +1,14 @@
 # ArrowJS Syntax
 
-VS Code syntax highlighting for ArrowJS `html\`...\`` and `t\`...\`` template literals.
+![ArrowJS](./assets/arrow-logo.png)
 
-This extension injects HTML grammar into Arrow template literals inside:
+ArrowJS is a tiny, type-safe reactive UI runtime built around JavaScript modules, template literals, and the DOM.
+
+[Docs](https://arrow-js.com) · [API Reference](https://arrow-js.com/api) · [Playground](https://arrow-js.com/play/)
+
+This package is the VS Code syntax extension for ArrowJS `html\`...\`` and `t\`...\`` template literals.
+
+It injects HTML grammar into Arrow template literals inside:
 
 - JavaScript
 - TypeScript
