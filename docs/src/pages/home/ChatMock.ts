@@ -15,16 +15,32 @@ function agentIcon() {
   `
 }
 
+function typingDots() {
+  return html`
+    <div class="flex items-start gap-2.5">
+      ${agentIcon()}
+      <div class="px-3.5 py-2.5 rounded-2xl rounded-tl-sm bg-zinc-100 dark:bg-zinc-800">
+        <div class="flex gap-1 items-center h-5">
+          <div class="typing-dot" style="animation-delay:0ms"></div>
+          <div class="typing-dot" style="animation-delay:150ms"></div>
+          <div class="typing-dot" style="animation-delay:300ms"></div>
+        </div>
+      </div>
+    </div>
+  `
+}
+
 export function ChatMock() {
-  const first = scenarios[0]
-  const isClient = typeof window !== 'undefined'
+  const firstScenario = scenarios[0]
+  const firstAgentText = firstScenario.messages[1]?.text || ''
 
   const st = reactive({
     idx: 0,
     showAgent: true,
-    agentChars: 999,
-    ui: isClient ? false : true,
-    uiVisible: false,
+    agentChars: firstAgentText.length,
+    typing: false,
+    ui: true,
+    uiVisible: true,
     fading: false,
   })
 
@@ -43,6 +59,11 @@ export function ChatMock() {
     }, ms)
   }
 
+  function delay(fn: () => void, ms: number) {
+    clearTimeout(tid)
+    tid = setTimeout(fn, ms)
+  }
+
   function stopStream() {
     if (streamTimer) {
       clearInterval(streamTimer)
@@ -50,53 +71,60 @@ export function ChatMock() {
     }
   }
 
-  function streamAgent(onDone: () => void) {
+  function streamAgent(onDone: () => void, fast = false) {
     const text = scenarios[st.idx].messages[1]?.text || ''
+    const step = fast ? 4 : 2
+    const interval = fast ? 14 : 18
+
     st.showAgent = true
     st.agentChars = 0
     stopStream()
     streamTimer = setInterval(() => {
-      st.agentChars += 2
+      st.agentChars += step
       if (st.agentChars >= text.length) {
         st.agentChars = text.length
         stopStream()
         onDone()
       }
-    }, 18)
-  }
-
-  function delay(fn: () => void, ms: number) {
-    clearTimeout(tid)
-    tid = setTimeout(fn, ms)
+    }, interval)
   }
 
   function transitionTo(idx: number, fast = false) {
     st.fading = true
+    st.typing = false
     stopStream()
     clearTimeout(tid)
+
     const wait = fast ? delay : schedule
     const fadeMs = fast ? 150 : 350
     const pauseMs = fast ? 100 : 400
+    const typingMs = fast ? 450 : 850
     const revealMs = fast ? 150 : 350
-    setTimeout(() => {
+
+    delay(() => {
       st.idx = idx
       st.showAgent = false
       st.agentChars = 0
       st.ui = false
       st.uiVisible = false
       st.fading = false
+
       wait(() => {
-        streamAgent(() => {
-          wait(() => {
-            st.ui = true
-            requestAnimationFrame(() => {
+        st.typing = true
+        wait(() => {
+          st.typing = false
+          streamAgent(() => {
+            wait(() => {
+              st.ui = true
               requestAnimationFrame(() => {
-                st.uiVisible = true
-                schedule(nextScenario, 8000)
+                requestAnimationFrame(() => {
+                  st.uiVisible = true
+                  schedule(nextScenario, 8000)
+                })
               })
-            })
-          }, revealMs)
-        })
+            }, revealMs)
+          }, fast)
+        }, typingMs)
       }, pauseMs)
     }, fadeMs)
   }
@@ -110,14 +138,8 @@ export function ChatMock() {
     transitionTo(i, true)
   }
 
-  if (isClient) {
-    requestAnimationFrame(() => {
-      st.ui = true
-      requestAnimationFrame(() => {
-        st.uiVisible = true
-      })
-    })
-    schedule(nextScenario, 7000)
+  if (typeof window !== 'undefined') {
+    schedule(nextScenario, 6000)
   }
 
   return html`
@@ -167,23 +189,30 @@ export function ChatMock() {
               </div>
             `}
 
-            ${() =>
-              st.showAgent
-                ? html`
-                    <div class="flex items-start gap-2.5">
-                      ${agentIcon()}
-                      <div
-                        class="px-3.5 py-2 rounded-2xl rounded-tl-sm bg-zinc-100 dark:bg-zinc-800 text-sm leading-snug text-zinc-700 dark:text-zinc-300 max-w-[85%]"
-                      >
-                        ${() => {
-                          const full = scenarios[st.idx].messages[1]?.text || ''
-                          const len = st.agentChars
-                          return len >= full.length ? full : full.slice(0, len)
-                        }}
-                      </div>
-                    </div>
-                  `
-                : ''}
+            ${() => {
+              if (st.typing) {
+                return typingDots()
+              }
+
+              if (!st.showAgent) {
+                return ''
+              }
+
+              return html`
+                <div class="flex items-start gap-2.5">
+                  ${agentIcon()}
+                  <div
+                    class="px-3.5 py-2 rounded-2xl rounded-tl-sm bg-zinc-100 dark:bg-zinc-800 text-sm leading-snug text-zinc-700 dark:text-zinc-300 max-w-[85%]"
+                  >
+                    ${() => {
+                      const full = scenarios[st.idx].messages[1]?.text || ''
+                      const len = st.agentChars
+                      return len >= full.length ? full : full.slice(0, len)
+                    }}
+                  </div>
+                </div>
+              `
+            }}
 
             ${() =>
               st.ui
