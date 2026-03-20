@@ -29,6 +29,7 @@ describe('create-arrow-js', () => {
   it('scaffolds a Vite 8 Arrow starter', async () => {
     const workspace = await createTempDir()
     const projectDir = path.resolve(workspace, 'arrow-app')
+    const versions = await readCreateArrowVersions()
 
     const result = await scaffoldArrowApp(projectDir)
 
@@ -37,7 +38,7 @@ describe('create-arrow-js', () => {
     )
 
     expect(result.projectName).toBe('arrow-app')
-    expect(packageJson.dependencies['@arrow-js/core']).toBe('^1.0.0-alpha.9')
+    expect(packageJson.dependencies['@arrow-js/core']).toBe(`^${versions['@arrow-js/core']}`)
     expect(packageJson.scripts.dev).toBe('node server.mjs')
     await expectFile(projectDir, '.gitignore')
     await expectFile(projectDir, 'src/App.ts')
@@ -48,7 +49,6 @@ describe('create-arrow-js', () => {
 
   it(
     'installs and builds against packed workspace packages',
-    { timeout: 300_000 },
     async () => {
       const workspace = await createTempDir()
       const projectDir = path.resolve(workspace, 'arrow-app')
@@ -81,7 +81,8 @@ describe('create-arrow-js', () => {
       await execa('pnpm', ['build'], {
         cwd: projectDir,
       })
-    }
+    },
+    300_000
   )
 })
 
@@ -89,6 +90,15 @@ async function createTempDir() {
   const directory = await fs.mkdtemp(path.resolve(os.tmpdir(), 'arrow-create-'))
   tempDirs.push(directory)
   return directory
+}
+
+async function readCreateArrowVersions() {
+  return JSON.parse(
+    await fs.readFile(
+      path.resolve(repoRoot, 'packages/create-arrow-js/versions.json'),
+      'utf8'
+    )
+  ) as Record<(typeof arrowPackages)[number], string>
 }
 
 async function expectFile(rootDir: string, relativePath: string) {
