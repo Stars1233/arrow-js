@@ -1,4 +1,4 @@
-name = "arrowjs-docs-preview"
+name = 'arrowjs-docs'
 main = "src/index.ts"
 compatibility_date = "2026-03-20"
 workers_dev = true
