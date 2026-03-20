@@ -17,7 +17,12 @@ type IdleWindow = Window & typeof globalThis & {
 }
 
 await hydrateIntoRoot('header-root', Header(window.location.pathname))
-await hydrateEachIsland('[data-island="cli-command"]', () => CliCommand())
+await hydrateEachIsland('[data-island="cli-command"]', (root) =>
+  CliCommand({
+    command: root.getAttribute('data-command') ?? undefined,
+    ariaLabel: root.getAttribute('data-aria-label') ?? undefined,
+  })
+)
 
 if (window.location.pathname.replace(/\/+$/, '') === '/api') {
   const { hydrateApiIslands } = await import('./pages/api/islands')
