@@ -1,11 +1,25 @@
-import { component, html, reactive } from '@arrow-js/core'
+import { component, html, onCleanup, reactive, type Props } from '@arrow-js/core'
 
 const defaultCommand = 'pnpm create arrow-js@latest arrow-app'
 const defaultAriaLabel = 'Copy Arrow app scaffold command'
 
-type CliCommandProps = {
-  ariaLabel?: string
-  command?: string
+type CliCommandProps = Record<PropertyKey, unknown> & {
+  ariaLabel: string
+  command: string
+}
+
+type CliCommandOptions = {
+  ariaLabel?: string | null
+  command?: string | null
+}
+
+export function resolveCliCommandProps(
+  props: CliCommandOptions = {}
+): CliCommandProps {
+  return {
+    command: props.command ?? defaultCommand,
+    ariaLabel: props.ariaLabel ?? defaultAriaLabel,
+  }
 }
 
 function fallbackCopyText(text: string) {
@@ -71,14 +85,14 @@ function getBurstOrigin(event: MouseEvent) {
   }
 }
 
-export const CliCommand = component((props?: CliCommandProps) => {
+export const CliCommand = component<CliCommandProps>((props: Props<CliCommandProps>) => {
   const state = reactive({ copied: false })
-  let timer: ReturnType<typeof setTimeout>
-  const command = props?.command ?? defaultCommand
-  const ariaLabel = props?.ariaLabel ?? defaultAriaLabel
+  let timer: ReturnType<typeof setTimeout> | undefined
+
+  onCleanup(() => clearTimeout(timer))
 
   async function copy(event: MouseEvent) {
-    const copied = await copyText(command)
+    const copied = await copyText(props.command)
 
     if (!copied) {
       return
@@ -109,10 +123,10 @@ export const CliCommand = component((props?: CliCommandProps) => {
       data-rain-collider
       @click="${copy}"
       class="cli-command"
-      aria-label="${ariaLabel}"
+      aria-label="${() => props.ariaLabel}"
     >
       <span class="cli-prompt">$</span>
-      <code class="cli-text">${renderCommand(command)}</code>
+      <code class="cli-text">${() => renderCommand(props.command)}</code>
       <span
         class="${() => state.copied ? 'cli-copy cli-copy--done' : 'cli-copy'}"
       >${() =>
@@ -142,13 +156,12 @@ function renderCommand(command: string) {
   })
 }
 
-export function CliCommandIsland(props?: CliCommandProps) {
-  const command = props?.command ?? defaultCommand
-  const ariaLabel = props?.ariaLabel ?? defaultAriaLabel
+export function CliCommandIsland(props?: CliCommandOptions) {
+  const resolvedProps = resolveCliCommandProps(props)
 
   return html`<div
     data-island="cli-command"
-    data-command="${command}"
-    data-aria-label="${ariaLabel}"
-  >${CliCommand({ command, ariaLabel })}</div>`
+    data-command="${resolvedProps.command}"
+    data-aria-label="${resolvedProps.ariaLabel}"
+  >${CliCommand(resolvedProps)}</div>`
 }

@@ -1,6 +1,6 @@
 import '@shikijs/twoslash/style-rich.css'
 import { Header } from './components/Header'
-import { CliCommand } from './components/CliCommand'
+import { CliCommand, resolveCliCommandProps } from './components/CliCommand'
 import { hydrateEachIsland, hydrateIntoRoot } from './islands'
 
 type NavigatorWithConnection = Navigator & {
@@ -18,10 +18,10 @@ type IdleWindow = Window & typeof globalThis & {
 
 await hydrateIntoRoot('header-root', Header(window.location.pathname))
 await hydrateEachIsland('[data-island="cli-command"]', (root) =>
-  CliCommand({
-    command: root.getAttribute('data-command') ?? undefined,
-    ariaLabel: root.getAttribute('data-aria-label') ?? undefined,
-  })
+  CliCommand(resolveCliCommandProps({
+    command: root.getAttribute('data-command'),
+    ariaLabel: root.getAttribute('data-aria-label'),
+  }))
 )
 
 if (window.location.pathname.replace(/\/+$/, '') === '/api') {
