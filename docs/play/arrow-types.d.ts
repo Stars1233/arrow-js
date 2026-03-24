@@ -23,7 +23,10 @@ declare module '@arrow-js/core' {
     (): DocumentFragment
     isT: boolean
     key: (key: string | number | undefined) => ArrowTemplate
+    _c: () => Chunk
   }
+
+  export interface Chunk {}
 
   export type Reactive<T extends ReactiveTarget> = {
     [P in keyof T]:
@@ -167,6 +170,20 @@ declare module '@arrow-js/core' {
   ): ComponentWithProps<T, TEvents>
   export { component as c }
 
+  export interface HydrationCapture {}
+
+  export function installAsyncComponentInstaller(installer: unknown | null): void
+  export function installHydrationCaptureProvider(
+    provider: (() => HydrationCapture | null) | null
+  ): void
+  export function createHydrationCapture(): HydrationCapture
+  export function adoptCapturedChunk(
+    capture: HydrationCapture,
+    chunk: Chunk,
+    map: WeakMap<Node, Node>,
+    visited?: WeakSet<Chunk>
+  ): void
+
   export function pick<T extends object, K extends keyof T>(
     source: T,
     ...keys: K[]
@@ -178,6 +195,8 @@ declare module '@arrow-js/core' {
 declare module '@arrow-js/framework' {
   import type {
     ArrowTemplate,
+    HydrationCapture,
+    ParentNode,
   } from '@arrow-js/core'
 
   export interface BoundaryOptions {
@@ -200,13 +219,46 @@ declare module '@arrow-js/framework' {
     payload: RenderPayload
   }
 
+  export interface FrameworkRenderContext {
+    asyncSnapshots: Record<string, unknown>
+    boundaries: string[]
+    hydrationCapture: HydrationCapture | null
+    flush(): Promise<void>
+  }
+
   export interface DocumentRenderParts {
     head?: string
     html: string
     payloadScript?: string
   }
 
+  export interface HydrationPayload {
+    html?: string
+    rootId?: string
+    async?: Record<string, unknown>
+    boundaries?: string[]
+  }
+
+  export interface SsrRenderOptions {
+    rootId?: string
+  }
+
+  export interface SsrRenderResult {
+    html: string
+    payload: HydrationPayload
+  }
+
   export function boundary(view: unknown, options?: BoundaryOptions): ArrowTemplate
+  export function getRenderContext(): FrameworkRenderContext | null
+  export function runWithRenderContext<T>(
+    context: FrameworkRenderContext | null,
+    callback: () => T
+  ): T
+  export function withRenderContext<T>(
+    callback: (context: FrameworkRenderContext) => T | Promise<T>,
+    options?: RenderOptions
+  ): Promise<T>
+  export function installFrameworkRuntime(): void
   export function render(
     root: ParentNode,
     view: unknown,
@@ -214,6 +266,11 @@ declare module '@arrow-js/framework' {
   ): Promise<RenderResult>
   export function toTemplate(view: unknown): ArrowTemplate
   export function renderDocument(template: string, parts: DocumentRenderParts): string
+  export function renderToString(
+    view: unknown,
+    options?: SsrRenderOptions
+  ): Promise<SsrRenderResult>
+  export function serializePayload(payload: unknown, id?: string): string
 }
 
 declare module '@arrow-js/sandbox' {

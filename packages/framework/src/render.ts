@@ -1,5 +1,5 @@
 import { html, nextTick } from '@arrow-js/core'
-import type { ArrowTemplate } from '@arrow-js/core/internal'
+import type { ArrowTemplate } from '@arrow-js/core'
 import { withRenderContext } from './context'
 
 export interface RenderOptions {

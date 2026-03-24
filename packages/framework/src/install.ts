@@ -1,7 +1,7 @@
 import {
   installAsyncComponentInstaller,
   installHydrationCaptureProvider,
-} from '@arrow-js/core/internal'
+} from '@arrow-js/core'
 import { asyncComponent } from './async'
 import { getRenderContext } from './context'
 

@@ -1,11 +1,11 @@
-import '@arrow-js/framework/internal'
+import '@arrow-js/framework'
 
 import {
   createHydrationCapture,
-} from '@arrow-js/core/internal'
-import type { ArrowTemplate, ParentNode } from '@arrow-js/core/internal'
-import type { RenderPayload } from '@arrow-js/framework/internal'
-import { toTemplate, withRenderContext } from '@arrow-js/framework/internal'
+} from '@arrow-js/core'
+import type { ArrowTemplate, ParentNode } from '@arrow-js/core'
+import type { RenderPayload } from '@arrow-js/framework'
+import { toTemplate, withRenderContext } from '@arrow-js/framework'
 import { hydrateTemplate } from './reconcile'
 
 export interface HydrationPayload {

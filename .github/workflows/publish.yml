@@ -100,6 +100,8 @@ jobs:
         run: pnpm install --frozen-lockfile
       - name: Sync package versions to tag
         run: node scripts/release.mjs sync --version "${{ needs.prepare.outputs.version }}"
+      - name: Build @arrow-js/highlight
+        run: pnpm --filter @arrow-js/highlight build
       - name: Publish @arrow-js/highlight
         working-directory: packages/highlight
         shell: bash
@@ -236,6 +238,8 @@ jobs:
         run: pnpm install --frozen-lockfile
       - name: Sync package versions to tag
         run: node scripts/release.mjs sync --version "${{ needs.prepare.outputs.version }}"
+      - name: Build @arrow-js/framework
+        run: pnpm --filter @arrow-js/framework build
       - name: Publish @arrow-js/framework
         working-directory: packages/framework
         shell: bash
@@ -271,6 +275,8 @@ jobs:
         run: pnpm install --frozen-lockfile
       - name: Sync package versions to tag
         run: node scripts/release.mjs sync --version "${{ needs.prepare.outputs.version }}"
+      - name: Build @arrow-js/ssr
+        run: pnpm --filter @arrow-js/ssr build
       - name: Publish @arrow-js/ssr
         working-directory: packages/ssr
         shell: bash
@@ -307,6 +313,8 @@ jobs:
         run: pnpm install --frozen-lockfile
       - name: Sync package versions to tag
         run: node scripts/release.mjs sync --version "${{ needs.prepare.outputs.version }}"
+      - name: Build @arrow-js/hydrate
+        run: pnpm --filter @arrow-js/hydrate build
       - name: Publish @arrow-js/hydrate
         working-directory: packages/hydrate
         shell: bash

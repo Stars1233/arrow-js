@@ -1,8 +1,8 @@
-import '@arrow-js/framework/internal'
+import '@arrow-js/framework'
 
-export { renderToString, serializePayload } from '@arrow-js/framework/ssr'
+export { renderToString, serializePayload } from '@arrow-js/framework'
 export type {
   HydrationPayload,
   SsrRenderOptions,
   SsrRenderResult,
-} from '@arrow-js/framework/ssr'
+} from '@arrow-js/framework'

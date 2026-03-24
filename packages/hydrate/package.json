@@ -13,8 +13,24 @@
   "bugs": {
     "url": "https://github.com/standardagents/arrow-js/issues"
   },
+  "main": "./dist/index.mjs",
+  "module": "./dist/index.mjs",
+  "types": "./dist/index.d.ts",
   "exports": {
-    ".": "./src/index.ts"
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.mjs"
+    },
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE.txt",
+    "arrow-logo.png"
+  ],
+  "scripts": {
+    "build": "node ../../scripts/build-package.mjs index=src/index.ts"
   },
   "dependencies": {
     "@arrow-js/core": "workspace:*",

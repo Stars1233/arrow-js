@@ -1,5 +1,5 @@
 import { nextTick } from '@arrow-js/core'
-import type { HydrationCapture } from '@arrow-js/core/internal'
+import type { HydrationCapture } from '@arrow-js/core'
 
 export interface RenderContext {
   pending: Set<Promise<unknown>>
