@@ -14,8 +14,6 @@ const packagedArrowLibraries = [
   '@arrow-js/highlight',
 ] as const
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
-const packageExportsTimeout =
-  process.platform === 'linux' && process.env.CI === 'true' ? 180_000 : 90_000
 const tempDirs: string[] = []
 
 afterEach(async () => {
@@ -118,7 +116,7 @@ describe('packaged Arrow exports', () => {
       expect(hydratePackage.exports['.'].import).toBe('./dist/index.mjs')
       expect(highlightPackage.exports['.'].import).toBe('./dist/index.mjs')
     },
-    packageExportsTimeout
+    90_000
   )
 })
 
