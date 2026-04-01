@@ -245,8 +245,11 @@ function syncTemplateToChunk(
     return
   }
   if (chunk._t && chunk._t !== template) {
-    ;(chunk._t as InternalTemplate)._m = false
-    ;(chunk._t as InternalTemplate)._h = undefined
+    const current = chunk._t as InternalTemplate
+    if (current._h === chunk) {
+      current._m = false
+      current._h = undefined
+    }
   }
   chunk._t = template
   chunk.k = template._k
@@ -254,6 +257,14 @@ function syncTemplateToChunk(
   template._h = chunk
   template._m = mounted
   writeExpressions(template._a!, chunk.e)
+}
+
+function releaseTemplate(chunk: Chunk) {
+  const template = chunk._t as InternalTemplate
+  if (template._h === chunk) {
+    template._m = false
+    template._h = undefined
+  }
 }
 
 function growChunkPool(size: number) {
@@ -639,7 +650,7 @@ function createRenderFn(capture: HydrationCapture | null): RenderController {
       }
       if (isTpl(renderable)) {
         const fragment = renderable()
-        previous = mountChunkFragment(fragment, renderable._c())
+        previous = mountChunkFragment(fragment, (renderable as InternalTemplate)._h!)
         return fragment
       }
       if (Array.isArray(renderable)) {
@@ -1096,25 +1107,29 @@ function createRenderFn(capture: HydrationCapture | null): RenderController {
       if (key in previousIndexByKey) overlaps++
     }
     if (!overlaps) {
-      const before = getNode(previousList[oldEnd]).nextSibling as ChildNode | null
       const first = getNode(previousList[oldStart], undefined, true)
       const last = getNode(previousList[oldEnd])
-      const range = document.createRange()
-      range.setStartBefore(first)
-      range.setEndAfter(last)
-      range.deleteContents()
-      for (let i = oldStart; i <= oldEnd; i++) {
-        const stale = previousList[i] as Chunk
-        forgetChunk(stale)
-        destroyChunk(stale, true)
-      }
       const fragment = document.createDocumentFragment()
       for (let i = newStart; i <= newEnd; i++) {
         const item = renderable[i]
         if (!isCmp(item) && !isTpl(item)) return null
         renderedList[i] = mountItem(item, fragment)
       }
-      parent.insertBefore(fragment, before)
+      const parent = first.parentNode
+      if (parent && first === parent.firstChild && last === parent.lastChild) {
+        parent.replaceChildren(fragment)
+      } else {
+        const range = document.createRange()
+        range.setStartBefore(first)
+        range.setEndAfter(last)
+        range.deleteContents()
+        range.insertNode(fragment)
+      }
+      for (let i = oldStart; i <= oldEnd; i++) {
+        const stale = previousList[i] as Chunk
+        forgetChunk(stale)
+        destroyChunk(stale, true)
+      }
       return renderedList
     }
 
@@ -1215,8 +1230,8 @@ function createRenderFn(capture: HydrationCapture | null): RenderController {
         syncTemplateToChunk(template, prev, true)
         return prev
       }
-      const chunk = template._c()
       const fragment = renderable()
+      const chunk = template._h!
       const mounted = mountChunkFragment(fragment, chunk)
       getNode(prev, anchor).after(fragment)
       forgetChunk(prev)
@@ -1243,7 +1258,7 @@ function createRenderFn(capture: HydrationCapture | null): RenderController {
     }
     if (isTpl(item)) {
       item(fragment)
-      const chunk = item._c()
+      const chunk = (item as InternalTemplate)._h!
       rememberKeyedChunk(chunk)
       return mountChunkFragment(fragment, chunk)
     }
@@ -1309,8 +1324,7 @@ let unmountStack: Array<
 
 function destroyChunk(chunk: Chunk, detached = false) {
   if (chunk.st) removeStaleChunk(chunk)
-  ;(chunk._t as InternalTemplate)._m = false
-  ;(chunk._t as InternalTemplate)._h = undefined
+  releaseTemplate(chunk)
   if (chunk.v) {
     for (let i = 0; i < chunk.v.length; i++) {
       const [target, event] = chunk.v[i]
@@ -1361,8 +1375,7 @@ function destroyChunk(chunk: Chunk, detached = false) {
 
 function recycleChunk(chunk: Chunk, detached = false) {
   if (!detached) moveDOMRef(chunk.ref, chunk.dom)
-  ;(chunk._t as InternalTemplate)._m = false
-  ;(chunk._t as InternalTemplate)._h = undefined
+  releaseTemplate(chunk)
   if (chunk.st || !chunk.r) return
   chunk.st = true
   let bucket = staleBySignature.get(chunk.g)
@@ -1440,8 +1453,7 @@ function removeUnmounted(
           continue
         }
         if (!detached) moveDOMRef(item.ref, item.dom)
-        ;(item._t as InternalTemplate)._m = false
-        ;(item._t as InternalTemplate)._h = undefined
+        releaseTemplate(item)
         if (item.st) continue
         item.st = true
         if (signature !== item.g) {

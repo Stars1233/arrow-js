@@ -606,6 +606,36 @@ describe('html', () => {
     </ul>`)
   })
 
+  it('preserves event handlers for non-keyed templates shifted by splicing', async () => {
+    const clicked: number[] = []
+    const data = reactive({
+      list: Array.from({ length: 15 }, (_, i) =>
+        html`<tr>
+          <td>${i + 1}</td>
+          <td><button @click="${() => clicked.push(i + 1)}">remove</button></td>
+        </tr>`
+      ),
+    })
+    const parent = document.createElement('div')
+    html`<table><tbody>${() => data.list}</tbody></table>`(parent)
+
+    data.list.splice(8, 1)
+    await nextTick()
+    data.list.splice(7, 1)
+    await nextTick()
+    data.list.splice(6, 1)
+    await nextTick()
+    data.list.splice(5, 1)
+    await nextTick()
+    data.list.splice(4, 1)
+    await nextTick()
+
+    const rows = parent.querySelectorAll('tbody tr')
+    expect(rows[5]?.firstElementChild?.textContent).toBe('11')
+    click(rows[5]?.querySelector('button') as HTMLButtonElement)
+    expect(clicked).toEqual([11])
+  })
+
   it('can render a list from an object', async () => {
     const data = reactive<{ food: Record<string, string> }>({
       food: {
