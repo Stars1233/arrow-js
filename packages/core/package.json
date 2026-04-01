@@ -1,6 +1,6 @@
 {
   "name": "@arrow-js/core",
-  "version": "1.0.5",
+  "version": "1.0.6",
   "description": "Reactivity without the framework.",
   "author": "Justin Schroeder <justin@wearebraid.com>",
   "license": "MIT",
