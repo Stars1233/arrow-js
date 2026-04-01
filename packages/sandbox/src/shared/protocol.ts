@@ -86,9 +86,12 @@ export interface RefBindingDescriptor {
   exprIndex: number
 }
 
+export type ElementNamespace = 'svg'
+
 export interface ElementDescriptor {
   kind: 'element'
   tag: string
+  namespace?: ElementNamespace
   staticAttributes: Record<string, string>
   dynamicAttributes: AttributeBindingDescriptor[]
   eventBindings: EventBindingDescriptor[]
@@ -132,6 +135,7 @@ export interface SerializedElementNode {
   kind: 'element'
   id: string
   tag: string
+  namespace?: ElementNamespace
   attrs: Record<string, string | boolean>
   events: Record<string, string>
   children: SerializedNode[]

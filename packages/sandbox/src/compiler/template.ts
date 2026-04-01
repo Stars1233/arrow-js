@@ -1,5 +1,6 @@
 import type {
   AttributeBindingDescriptor,
+  ElementNamespace,
   ElementDescriptor,
   TemplateDescriptor,
   TemplateNodeDescriptor,
@@ -10,6 +11,7 @@ import { SandboxCompileError } from '../host/errors'
 const expressionTokenPrefix = '__ARROW_SANDBOX_EXPR_'
 const expressionTokenSuffix = '__'
 const expressionPattern = /__ARROW_SANDBOX_EXPR_(\d+)__/g
+const svgNamespaceUri = 'http://www.w3.org/2000/svg'
 
 function getExpressionToken(index: number) {
   return `${expressionTokenPrefix}${index}${expressionTokenSuffix}`
@@ -162,6 +164,8 @@ function compileElementNode(element: Element): ElementDescriptor {
   return {
     kind: 'element',
     tag: element.tagName.toLowerCase(),
+    namespace:
+      element.namespaceURI === svgNamespaceUri ? 'svg' : undefined,
     staticAttributes,
     dynamicAttributes,
     eventBindings,
@@ -224,7 +228,8 @@ function collectExpressionIndexes(
 
 export function compileTemplateDescriptor(
   templateId: string,
-  strings: string[]
+  strings: string[],
+  namespace?: ElementNamespace
 ): TemplateDescriptor {
   if (typeof document === 'undefined') {
     throw new SandboxCompileError(
@@ -238,7 +243,17 @@ export function compileTemplateDescriptor(
   }, '')
 
   const template = document.createElement('template')
-  template.innerHTML = html
+  if (namespace === 'svg') {
+    template.innerHTML = `<svg xmlns="${svgNamespaceUri}">${html}</svg>`
+    const root = template.content.firstChild as SVGElement | null
+    if (root) {
+      const content = template.content
+      while (root.firstChild) content.appendChild(root.firstChild)
+      content.removeChild(root)
+    }
+  } else {
+    template.innerHTML = html
+  }
 
   const rootCandidates = Array.from(template.content.childNodes)
     .flatMap((node) => compileDomNode(node))

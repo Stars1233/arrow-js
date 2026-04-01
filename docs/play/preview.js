@@ -18,6 +18,7 @@ export const pick = mod.pick
 export const props = mod.props
 export const r = mod.r
 export const reactive = mod.reactive
+export const svg = mod.svg
 export const t = mod.t
 export const w = mod.w
 export const watch = mod.watch

@@ -9,6 +9,7 @@ export {
   pick as props,
   reactive,
   reactive as r,
+  svg,
   watch,
   watch as w,
 } from './runtime'

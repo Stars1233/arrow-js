@@ -844,6 +844,20 @@ export function Routing() {
             render the same page shape.
           </li>
         </ul>
+        <p>
+          For browser-only routing, Arrow recommends the native
+          <a
+            href="https://developer.mozilla.org/en-US/docs/Web/API/Navigation"
+            target="_blank"
+            rel="noopener"
+            >Navigation API</a
+          >
+          via <code>window.navigation</code> when your support matrix allows it.
+          It gives you a single navigation event stream and more reliable
+          history traversal than wiring everything around the older
+          <code>history.pushState()</code> flow. Keep a History API fallback if
+          you still support older browsers.
+        </p>
 
         ${TsCodeBlock(`import { html } from '@arrow-js/core'
 

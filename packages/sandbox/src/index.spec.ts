@@ -549,6 +549,36 @@ describe('@arrow-js/sandbox', () => {
     instance.destroy()
   })
 
+  it('supports unbound svg tagged templates in sandbox modules', async () => {
+    const root = document.createElement('div')
+
+    const instance = await sandbox(
+      `
+        const data = reactive({ values: [40, 20] })
+
+        export default html\`<svg width="100" height="100" viewBox="0 0 100 100">
+          \${() =>
+            data.values.map(
+              (value, index) => svg\`<rect
+                x="\${index * 10}"
+                y="\${100 - value}"
+                width="9"
+                height="\${value}"
+                fill="red"
+              />\`
+            )}
+        </svg>\`
+      `,
+      root
+    )
+
+    const rects = Array.from(root.querySelectorAll('rect'))
+    expect(rects).toHaveLength(2)
+    expect(rects[0]?.namespaceURI).toBe('http://www.w3.org/2000/svg')
+    expect(rects[1]?.getAttribute('height')).toBe('20')
+    instance.destroy()
+  })
+
   it('rejects namespace-style @arrow-js/core imports', async () => {
     const root = document.createElement('div')
 

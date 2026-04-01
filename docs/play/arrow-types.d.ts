@@ -114,6 +114,10 @@ declare module '@arrow-js/core' {
     strings: TemplateStringsArray | string[],
     ...expressions: unknown[]
   ): ArrowTemplate
+  export function svg(
+    strings: TemplateStringsArray | string[],
+    ...expressions: unknown[]
+  ): ArrowTemplate
   export { html as t }
 
   export function reactive<T extends ReactiveTarget>(data: T): Reactive<T>
@@ -406,6 +410,7 @@ type SsrRenderResult = import('@arrow-js/ssr').SsrRenderResult
 
 declare const html: typeof import('@arrow-js/core').html
 declare const reactive: typeof import('@arrow-js/core').reactive
+declare const svg: typeof import('@arrow-js/core').svg
 declare const watch: typeof import('@arrow-js/core').watch
 declare const nextTick: typeof import('@arrow-js/core').nextTick
 declare const component: typeof import('@arrow-js/core').component

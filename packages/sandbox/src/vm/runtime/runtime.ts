@@ -85,6 +85,7 @@ interface MountedElementNode {
   kind: 'element'
   id: string
   tag: string
+  namespace?: 'svg'
   attrs: Record<string, string | boolean>
   events: Record<string, string>
   children: MountedNode[]
@@ -303,6 +304,7 @@ function serialize(node: MountedNode): SerializedNode {
         kind: 'element',
         id: node.id,
         tag: node.tag,
+        namespace: node.namespace,
         attrs: { ...node.attrs },
         events: { ...node.events },
         children: node.children.map(serialize),
@@ -521,6 +523,7 @@ function mountDescriptor(
         kind: 'element',
         id: allocNodeId(),
         tag: descriptor.tag,
+        namespace: descriptor.namespace,
         attrs: { ...descriptor.staticAttributes },
         events: {},
         children: [],
@@ -686,6 +689,15 @@ export function html(
 ) {
   throw new Error(
     'Sandbox html tags must be precompiled before execution.'
+  )
+}
+
+export function svg(
+  _strings?: TemplateStringsArray | string[],
+  ..._expSlots: unknown[]
+) {
+  throw new Error(
+    'Sandbox svg tags must be precompiled before execution.'
   )
 }
 

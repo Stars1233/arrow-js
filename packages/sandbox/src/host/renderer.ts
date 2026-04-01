@@ -5,6 +5,8 @@ import type {
   VmPatch,
 } from '../shared/protocol'
 
+const svgNamespaceUri = 'http://www.w3.org/2000/svg'
+
 interface RegionAnchor {
   start: Comment
   end: Comment
@@ -71,7 +73,10 @@ export class HostRenderer {
         return fragment
       }
       case 'element': {
-        const element = document.createElement(serialized.tag)
+        const element =
+          serialized.namespace === 'svg'
+            ? document.createElementNS(svgNamespaceUri, serialized.tag)
+            : document.createElement(serialized.tag)
         this.nodes.set(serialized.id, element)
         this.nodeIds.set(element, serialized.id)
 

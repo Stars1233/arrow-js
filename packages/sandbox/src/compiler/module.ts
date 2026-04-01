@@ -7,13 +7,14 @@ import {
 } from './scope'
 import type { ESTreeNode } from './scope'
 import { compileTemplateDescriptor } from './template'
-import type { TemplateDescriptor } from '../shared/protocol'
+import type { ElementNamespace, TemplateDescriptor } from '../shared/protocol'
 import { SandboxCompileError } from '../host/errors'
 
 const supportedImports = new Set([
   'component',
   'c',
   'html',
+  'svg',
   't',
   'onCleanup',
   'pick',
@@ -70,24 +71,25 @@ function readImportBindings(program: ESTreeNode) {
   }
 }
 
-function isArrowTagIdentifier(
+function getArrowTagNamespace(
   node: ESTreeNode,
   coreLocals: Map<string, string>,
   missingImports: Set<string>,
   isBound: (name: string) => boolean
-) {
-  if (node.type !== 'Identifier') return false
+): ElementNamespace | 'html' | null {
+  if (node.type !== 'Identifier') return null
 
   const local = String(node.name)
   const imported = coreLocals.get(local)
-  if (imported === 'html' || imported === 't') return true
+  if (imported === 'svg') return 'svg'
+  if (imported === 'html' || imported === 't') return 'html'
 
-  if ((local === 'html' || local === 't') && !isBound(local)) {
+  if ((local === 'html' || local === 'svg' || local === 't') && !isBound(local)) {
     missingImports.add(local)
-    return true
+    return local === 'svg' ? 'svg' : 'html'
   }
 
-  return false
+  return null
 }
 
 export function preprocessModule(
@@ -103,7 +105,10 @@ export function preprocessModule(
   const { coreLocals, lastImportEnd } = readImportBindings(program)
   const missingImports = new Set<string>()
   const descriptors: TemplateDescriptor[] = []
-  const taggedTemplates: ESTreeNode[] = []
+  const taggedTemplates: Array<{
+    expression: ESTreeNode
+    namespace?: ElementNamespace
+  }> = []
 
   collectReferences(program, analysis, (node, scope, parent) => {
     if (
@@ -117,9 +122,15 @@ export function preprocessModule(
     if (node.type === 'TaggedTemplateExpression') {
       const tag = asNode(node.tag)
       const isBound = (name: string) => analysis.isNameBound(scope, name)
+      const tagNamespace = tag
+        ? getArrowTagNamespace(tag, coreLocals, missingImports, isBound)
+        : null
 
-      if (tag && isArrowTagIdentifier(tag, coreLocals, missingImports, isBound)) {
-        taggedTemplates.push(node)
+      if (tagNamespace) {
+        taggedTemplates.push({
+          expression: node,
+          namespace: tagNamespace === 'svg' ? 'svg' : undefined,
+        })
         return
       }
 
@@ -129,7 +140,7 @@ export function preprocessModule(
         coreLocals.has(String(asNode(tag.object)?.name))
       ) {
         throw new SandboxCompileError(
-          'Namespace-style Arrow html tags are not supported in @arrow-js/sandbox.'
+          'Namespace-style Arrow template tags are not supported in @arrow-js/sandbox.'
         )
       }
     }
@@ -137,10 +148,13 @@ export function preprocessModule(
 
   const output = new MagicString(source)
 
-  taggedTemplates.sort((left, right) => (right.start || 0) - (left.start || 0))
+  taggedTemplates.sort(
+    (left, right) =>
+      (right.expression.start || 0) - (left.expression.start || 0)
+  )
   let templateIndex = 0
 
-  for (const expression of taggedTemplates) {
+  for (const { expression, namespace } of taggedTemplates) {
     const quasi = expression.quasi as ESTreeNode
     const strings = (quasi.quasis as ESTreeNode[]).map((part) =>
       String((part.value as any).cooked ?? (part.value as any).raw ?? '')
@@ -149,7 +163,9 @@ export function preprocessModule(
       output.slice(part.start || 0, part.end || 0)
     )
     const descriptorId = `${path}#template:${templateIndex++}`
-    descriptors.push(compileTemplateDescriptor(descriptorId, strings))
+    descriptors.push(
+      compileTemplateDescriptor(descriptorId, strings, namespace)
+    )
 
     output.overwrite(
       expression.start || 0,
